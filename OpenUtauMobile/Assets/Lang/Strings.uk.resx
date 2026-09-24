@@ -1394,6 +1394,36 @@
   <data name="SingerManagement.VogenNotImplemented" xml:space="preserve">
     <value>Майстер встановлення банків Vogen ще не реалізовано, встановіть вручну</value>
   </data>
+  <data name="SingerManagement.TsnVoiceInstalled" xml:space="preserve">
+    <value>Співака TsnVoice встановлено: {0}</value>
+  </data>
+  <data name="SingerManagement.TsnVoiceInstallFailed" xml:space="preserve">
+    <value>Не вдалося встановити співака TsnVoice: {0}</value>
+  </data>
+  <data name="DependencyManager.TsnVoiceTab" xml:space="preserve">
+    <value>TSNVOICE</value>
+  </data>
+  <data name="TsnVoice.Version" xml:space="preserve">
+    <value>Версія</value>
+  </data>
+  <data name="TsnVoice.InstalledVersions" xml:space="preserve">
+    <value>Встановлено: {0}</value>
+  </data>
+  <data name="TsnVoice.DownloadSuccess" xml:space="preserve">
+    <value>Встановлено: {0} {1}</value>
+  </data>
+  <data name="TsnVoice.DownloadFailed" xml:space="preserve">
+    <value>Помилка завантаження: {0}</value>
+  </data>
+  <data name="TsnVoice.Removed" xml:space="preserve">
+    <value>Видалено: {0} {1}</value>
+  </data>
+  <data name="TsnVoice.RemoveFailed" xml:space="preserve">
+    <value>Помилка видалення: {0}</value>
+  </data>
+  <data name="TsnVoice.LoadFailed" xml:space="preserve">
+    <value>Не вдалося завантажити каталог голосів: {0}</value>
+  </data>
   <data name="ProjectEdit.BpmRange" xml:space="preserve">
     <value>BPM має бути в межах від 10 до 1000</value>
   </data>

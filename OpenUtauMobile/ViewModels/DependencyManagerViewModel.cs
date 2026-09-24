@@ -57,6 +57,9 @@ public class DependencyManagerViewModel : NavigateViewModelBase
     [Reactive]
     public bool IsInstallingFromFile { get; set; }
 
+    /// <summary>TSNVOICE 语音管理器</summary>
+    public TsnVoiceManagerViewModel TsnVoice { get; }
+
     // ═══════════════════════════════════════════════════
     //  Commands
     // ═══════════════════════════════════════════════════
@@ -75,6 +78,7 @@ public class DependencyManagerViewModel : NavigateViewModelBase
         BackCommand = ReactiveCommand.Create(OnBack);
         RefreshRegistryCommand = ReactiveCommand.CreateFromTask(LoadAvailablePackagesAsync);
         RefreshInstalledCommand = ReactiveCommand.CreateFromTask(LoadInstalledPackagesAsync);
+        TsnVoice = new TsnVoiceManagerViewModel();
         IObservable<bool> canInstallFromFile = this
             .WhenAnyValue(x => x.IsInstallingFromFile)
             .Select(isInstalling => !isInstalling);
@@ -87,6 +91,7 @@ public class DependencyManagerViewModel : NavigateViewModelBase
         {
             await LoadAvailablePackagesAsync();
             await LoadInstalledPackagesAsync();
+            await TsnVoice.LoadAsync();
         });
 
         // TODO: 实现搜索和排序功能

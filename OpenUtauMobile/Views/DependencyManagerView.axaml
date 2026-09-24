@@ -431,6 +431,152 @@
                     </ScrollViewer>
                 </TabItem>
 
+                <!-- Tab 2: TSNVOICE -->
+                <TabItem>
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="{x:Static foundation:LayoutTokens.SpaceXS}">
+                            <TextBlock Text="{DynamicResource DependencyManager.TsnVoiceTab}" />
+                            <Border Classes="DependencyCountBadge">
+                                <TextBlock Text="{Binding TsnVoice.Voices.Count}" />
+                            </Border>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Border Padding="24,16,24,24">
+                            <StackPanel Classes="DependencyPageContent">
+                                <!-- 刷新 -->
+                                <Button Classes="icon outlined"
+                                        Command="{Binding TsnVoice.RefreshCommand}"
+                                        ToolTip.Tip="{DynamicResource DependencyManager.Refresh}"
+                                        HorizontalAlignment="Right">
+                                    <iconPacks:PackIconPhosphorIcons Kind="ArrowsClockwise"
+                                        Width="{x:Static semantic:IconTokens.Standard}"
+                                        Height="{x:Static semantic:IconTokens.Standard}" />
+                                </Button>
+
+                                <!-- 加载状态 -->
+                                <StackPanel IsVisible="{Binding TsnVoice.IsLoading}"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Spacing="{x:Static foundation:LayoutTokens.SpaceSM}"
+                                            Margin="0,60,0,0">
+                                    <ProgressBar IsIndeterminate="True" HorizontalAlignment="Stretch" />
+                                    <TextBlock Text="{DynamicResource DependencyManager.LoadingAvailable}"
+                                               Foreground="{DynamicResource Sem.Color.Outline}"
+                                               HorizontalAlignment="Center" />
+                                </StackPanel>
+
+                                <!-- 错误信息 -->
+                                <TextBlock Text="{Binding TsnVoice.ErrorMessage}"
+                                           Foreground="{DynamicResource Sem.Color.Error}"
+                                           TextWrapping="Wrap"
+                                           HorizontalAlignment="Center" />
+
+                                <!-- 语音列表 -->
+                                <ItemsControl ItemsSource="{Binding TsnVoice.Voices}">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="{x:Static foundation:LayoutTokens.SpaceSM}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:TsnVoiceVoiceItemViewModel">
+                                            <Border Classes="DependencyCard">
+                                                <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="{x:Static foundation:LayoutTokens.SpaceSM}">
+                                                    <!-- Row 0: 名称 + 语言 -->
+                                                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{x:Static foundation:LayoutTokens.SpaceM}">
+                                                        <Border Grid.Column="0"
+                                                                Width="48" Height="48"
+                                                                CornerRadius="{x:Static foundation:ShapeTokens.CornerL}"
+                                                                Background="{DynamicResource Sem.Color.PrimaryContainer}">
+                                                            <iconPacks:PackIconPhosphorIcons Width="{x:Static semantic:IconTokens.Standard}" Height="{x:Static semantic:IconTokens.Standard}"
+                                                                    HorizontalAlignment="Center"
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{DynamicResource Sem.Color.Primary}"
+                                                                    Kind="Microphone" />
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="{x:Static foundation:LayoutTokens.SpaceXS}">
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontSize="{x:Static semantic:TypographyTokens.BodyLSize}"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource Sem.Color.OnSurface}" />
+                                                            <TextBlock Text="{Binding Id}"
+                                                                       FontSize="{x:Static semantic:TypographyTokens.BodySSize}"
+                                                                       FontFamily="Consolas,Courier New,monospace"
+                                                                       Foreground="{DynamicResource Sem.Color.Outline}" />
+                                                        </StackPanel>
+                                                        <Border Grid.Column="2"
+                                                                Background="{DynamicResource Sem.Color.SuccessContainer}"
+                                                                CornerRadius="{x:Static foundation:ShapeTokens.CornerM}"
+                                                                VerticalAlignment="Center" Padding="12,4">
+                                                            <TextBlock Text="{Binding Language}"
+                                                                       FontSize="{x:Static semantic:TypographyTokens.BodySSize}"
+                                                                       FontWeight="Medium"
+                                                                       Foreground="{DynamicResource Sem.Color.OnSurfaceVariant}" />
+                                                        </Border>
+                                                    </Grid>
+                                                    <!-- Row 1: 版本选择 -->
+                                                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="{x:Static foundation:LayoutTokens.SpaceSM}">
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{DynamicResource TsnVoice.Version}"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="{x:Static semantic:TypographyTokens.BodyMSize}"
+                                                                   Foreground="{DynamicResource Sem.Color.Outline}" />
+                                                        <ComboBox Grid.Column="1"
+                                                                  ItemsSource="{Binding Versions}"
+                                                                  SelectedItem="{Binding SelectedVersion}"
+                                                                  HorizontalAlignment="Stretch" />
+                                                    </Grid>
+                                                    <!-- Row 2: 已安装版本 -->
+                                                    <TextBlock Grid.Row="2"
+                                                               Text="{Binding InstalledText}"
+                                                               FontSize="{x:Static semantic:TypographyTokens.BodySSize}"
+                                                               Foreground="{DynamicResource Sem.Color.Outline}" />
+                                                    <!-- Row 3: 下载 / 删除 -->
+                                                    <Grid Grid.Row="3" ColumnDefinitions="*,*" ColumnSpacing="{x:Static foundation:LayoutTokens.SpaceSM}">
+                                                        <Button Grid.Column="0"
+                                                                Command="{Binding DownloadCommand}"
+                                                                Classes="filled" MinHeight="{x:Static semantic:InteractionTokens.TouchTarget}"
+                                                                HorizontalAlignment="Stretch">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{x:Static foundation:LayoutTokens.SpaceS}">
+                                                                <iconPacks:PackIconPhosphorIcons Width="{x:Static semantic:IconTokens.Small}"
+                                                                        Height="{x:Static semantic:IconTokens.Small}"
+                                                                        Kind="DownloadSimple" />
+                                                                <TextBlock Text="{DynamicResource Common.Install}"
+                                                                           IsVisible="{Binding !IsSelectedInstalled}"
+                                                                           FontSize="{x:Static semantic:TypographyTokens.BodyMSize}" FontWeight="Medium" />
+                                                                <TextBlock Text="{DynamicResource Common.Update}"
+                                                                           IsVisible="{Binding IsSelectedInstalled}"
+                                                                           FontSize="{x:Static semantic:TypographyTokens.BodyMSize}" FontWeight="Medium" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button Grid.Column="1"
+                                                                Command="{Binding RemoveCommand}"
+                                                                Classes="destructive" MinHeight="{x:Static semantic:InteractionTokens.TouchTarget}"
+                                                                HorizontalAlignment="Stretch">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{x:Static foundation:LayoutTokens.SpaceS}">
+                                                                <iconPacks:PackIconPhosphorIcons Width="{x:Static semantic:IconTokens.Small}" Height="{x:Static semantic:IconTokens.Small}"
+                                                                    Kind="TrashSimple" />
+                                                                <TextBlock Text="{DynamicResource Common.Uninstall}"
+                                                                           FontSize="{x:Static semantic:TypographyTokens.BodyMSize}" FontWeight="Medium" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </Grid>
+                                                    <!-- 下载进度 -->
+                                                    <ProgressBar Grid.Row="3"
+                                                                 IsVisible="{Binding IsBusy}"
+                                                                 Value="{Binding Progress}"
+                                                                 Minimum="0" Maximum="100"
+                                                                 Height="8"
+                                                                 VerticalAlignment="Bottom" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+                </TabItem>
+
             </TabControl>
 
         </DockPanel>

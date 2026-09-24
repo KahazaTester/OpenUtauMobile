@@ -29,3 +29,18 @@ HifiSampler
 - Nature of changes: the original Python-based pipeline was adapted and rewritten for OpenUtauMobile2 in C#, integrated into the renderer architecture, and modified for the project's runtime, dependency, and rendering systems.
 
 The full license text used for this dependency is included in licenses/HifiSampler.Apache-2.0.txt.
+
+VoiSona .tsnvoice engine reference
+
+- The C# inference pipeline, container/package parsing, language frontends, SINGER2 labels,
+  HTS duration handling, context compiler, acoustic postprocess and MLSA DSP in
+  OpenUtau.Core/TsnVoice/ are a managed port of its native C++ core and C# bridge,
+  adapted to OpenUtauMobile's renderer/singer/phonemizer architecture and its
+  existing ONNX Runtime distribution (no new native binaries).
+- English LTS fallback model data (third_party/flite, CMU Flite) has not been ported;
+  out-of-dictionary English words report an explicit unsupported error.
+- Bundled runtime data under OpenUtau.Core/TsnVoice/Dictionaries/ (G2P dictionaries),
+  OpenUtau.Core/TsnVoice/Voice/catalog.json, list.json and Voice/Singer/ portraits
+  are copied from the reference project's resources/ for out-of-the-box use and remain
+  subject to their respective upstream terms. Downloadable .tsnvoice packages themselves
+  are not included; users must ensure their own licensed voice data.

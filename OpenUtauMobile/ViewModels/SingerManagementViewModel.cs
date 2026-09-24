@@ -1,4 +1,5 @@
 ﻿using OpenUtauMobile.Services.Dialogs;
+using System;
 using System.Collections.Generic;
 using System.Reactive;
 using System.Threading.Tasks;
@@ -41,7 +42,7 @@ public class SingerManagementViewModel : NavigateViewModelBase
     private async void OnAddSinger()
     {
         // 打开文件选择器，支持多种压缩包格式
-        string[] filters = new[] { "*.zip", "*.rar", "*.uar", "*.vogen" };
+        string[] filters = new[] { "*.zip", "*.rar", "*.uar", "*.vogen", "*.tsnvoice" };
         string filePath = await FilePicker.PickSingleFileAsync(L.S("FilePicker.SelectSingerFile"), filters);
 
         if (string.IsNullOrEmpty(filePath))
@@ -57,12 +58,34 @@ public class SingerManagementViewModel : NavigateViewModelBase
             // TODO: 导航到 VogenSingerSetupViewModel
             ToastService.Enqueue(L.S("SingerManagement.VogenNotImplemented"));
         }
+        else if (extension == ".tsnvoice")
+        {
+            // TsnVoice 单文件歌手：直接安装，与 Vogen 安装方式对应。
+            InstallTsnVoice(filePath);
+        }
         else if (extension == ".zip" || extension == ".rar" || extension == ".uar")
         {
             // 导航到 Classic 歌手安装向导
             ClassicSingerSetupViewModel setupVM = new ClassicSingerSetupViewModel(Navigator);
             setupVM.ArchiveFilePath = filePath;
             Navigator.Navigate(setupVM);
+        }
+    }
+
+    private void InstallTsnVoice(string filePath)
+    {
+        try
+        {
+            OpenUtau.Core.TsnVoice.TsnVoiceSingerInstaller.Install(filePath);
+            ToastService.Enqueue(string.Format(
+                L.S("SingerManagement.TsnVoiceInstalled"),
+                System.IO.Path.GetFileName(filePath)));
+        }
+        catch (Exception ex)
+        {
+            ToastService.Enqueue(string.Format(
+                L.S("SingerManagement.TsnVoiceInstallFailed"),
+                ex.Message));
         }
     }
 

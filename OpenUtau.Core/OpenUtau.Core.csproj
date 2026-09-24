@@ -80,6 +80,15 @@
             <LastGenOutput>VogenRes.Designer.cs</LastGenOutput>
         </EmbeddedResource>
     </ItemGroup>
+    <ItemGroup>
+        <!-- TsnVoice 运行时数据：发音词典、语音目录与歌手立绘，打包为内嵌资源，开箱即用。 -->
+        <EmbeddedResource Include="TsnVoice\Dictionaries\**\*">
+            <LogicalName>TsnVoice.Dictionaries.$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\', '.').Replace('/', '.'))</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="TsnVoice\Voice\**\*">
+            <LogicalName>TsnVoice.Voice.$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\', '.').Replace('/', '.'))</LogicalName>
+        </EmbeddedResource>
+    </ItemGroup>
     <PropertyGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">
         <DefineConstants>WINDOWS</DefineConstants>
     </PropertyGroup>

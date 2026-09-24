@@ -1468,6 +1468,36 @@
   <data name="SingerManagement.VogenNotImplemented" xml:space="preserve">
     <value>Vogenシンガーセットアップウィザードは未実装です。手動でインストールしてください</value>
   </data>
+  <data name="SingerManagement.TsnVoiceInstalled" xml:space="preserve">
+    <value>TsnVoiceシンガー {0} をインストールしました</value>
+  </data>
+  <data name="SingerManagement.TsnVoiceInstallFailed" xml:space="preserve">
+    <value>TsnVoiceシンガーのインストールに失敗しました：{0}</value>
+  </data>
+  <data name="DependencyManager.TsnVoiceTab" xml:space="preserve">
+    <value>TSNVOICE</value>
+  </data>
+  <data name="TsnVoice.Version" xml:space="preserve">
+    <value>バージョン</value>
+  </data>
+  <data name="TsnVoice.InstalledVersions" xml:space="preserve">
+    <value>インストール済み：{0}</value>
+  </data>
+  <data name="TsnVoice.DownloadSuccess" xml:space="preserve">
+    <value>{0} {1} をインストールしました</value>
+  </data>
+  <data name="TsnVoice.DownloadFailed" xml:space="preserve">
+    <value>ダウンロードに失敗しました：{0}</value>
+  </data>
+  <data name="TsnVoice.Removed" xml:space="preserve">
+    <value>{0} {1} を削除しました</value>
+  </data>
+  <data name="TsnVoice.RemoveFailed" xml:space="preserve">
+    <value>削除に失敗しました：{0}</value>
+  </data>
+  <data name="TsnVoice.LoadFailed" xml:space="preserve">
+    <value>ボイスカタログの読み込みに失敗しました：{0}</value>
+  </data>
   <data name="ProjectEdit.BpmRange" xml:space="preserve">
     <value>BPMは10〜1000の間の数値である必要があります</value>
   </data>

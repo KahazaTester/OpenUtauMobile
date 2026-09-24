@@ -1471,6 +1471,36 @@
   <data name="SingerManagement.VogenNotImplemented" xml:space="preserve">
     <value>Vogen 歌手安装向导尚未实现，请手动安装</value>
   </data>
+  <data name="SingerManagement.TsnVoiceInstalled" xml:space="preserve">
+    <value>已安装 TsnVoice 歌手 {0}</value>
+  </data>
+  <data name="SingerManagement.TsnVoiceInstallFailed" xml:space="preserve">
+    <value>TsnVoice 歌手安装失败：{0}</value>
+  </data>
+  <data name="DependencyManager.TsnVoiceTab" xml:space="preserve">
+    <value>TSNVOICE</value>
+  </data>
+  <data name="TsnVoice.Version" xml:space="preserve">
+    <value>版本</value>
+  </data>
+  <data name="TsnVoice.InstalledVersions" xml:space="preserve">
+    <value>已安装：{0}</value>
+  </data>
+  <data name="TsnVoice.DownloadSuccess" xml:space="preserve">
+    <value>已安装 {0} {1}</value>
+  </data>
+  <data name="TsnVoice.DownloadFailed" xml:space="preserve">
+    <value>下载失败：{0}</value>
+  </data>
+  <data name="TsnVoice.Removed" xml:space="preserve">
+    <value>已卸载 {0} {1}</value>
+  </data>
+  <data name="TsnVoice.RemoveFailed" xml:space="preserve">
+    <value>卸载失败：{0}</value>
+  </data>
+  <data name="TsnVoice.LoadFailed" xml:space="preserve">
+    <value>语音目录加载失败：{0}</value>
+  </data>
   <data name="ProjectEdit.BpmRange" xml:space="preserve">
     <value>BPM 须为 10 ~ 1000 之间的数值</value>
   </data>

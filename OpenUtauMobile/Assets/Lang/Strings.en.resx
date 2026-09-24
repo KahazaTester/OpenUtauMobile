@@ -1471,6 +1471,36 @@
   <data name="SingerManagement.VogenNotImplemented" xml:space="preserve">
     <value>Vogen singer setup wizard is not yet implemented, please install manually</value>
   </data>
+  <data name="SingerManagement.TsnVoiceInstalled" xml:space="preserve">
+    <value>Installed TsnVoice singer {0}</value>
+  </data>
+  <data name="SingerManagement.TsnVoiceInstallFailed" xml:space="preserve">
+    <value>Failed to install TsnVoice singer: {0}</value>
+  </data>
+  <data name="DependencyManager.TsnVoiceTab" xml:space="preserve">
+    <value>TSNVOICE</value>
+  </data>
+  <data name="TsnVoice.Version" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="TsnVoice.InstalledVersions" xml:space="preserve">
+    <value>Installed: {0}</value>
+  </data>
+  <data name="TsnVoice.DownloadSuccess" xml:space="preserve">
+    <value>Installed {0} {1}</value>
+  </data>
+  <data name="TsnVoice.DownloadFailed" xml:space="preserve">
+    <value>Download failed: {0}</value>
+  </data>
+  <data name="TsnVoice.Removed" xml:space="preserve">
+    <value>Removed {0} {1}</value>
+  </data>
+  <data name="TsnVoice.RemoveFailed" xml:space="preserve">
+    <value>Remove failed: {0}</value>
+  </data>
+  <data name="TsnVoice.LoadFailed" xml:space="preserve">
+    <value>Failed to load voice catalog: {0}</value>
+  </data>
   <data name="ProjectEdit.BpmRange" xml:space="preserve">
     <value>BPM must be a value between 10 and 1000</value>
   </data>
