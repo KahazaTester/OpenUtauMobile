@@ -66,15 +66,20 @@ namespace OpenUtau.Core.TsnVoice {
         public string DownloadBaseUrl { get; private set; } = string.Empty;
 
         /// <summary>
-        /// 构造下载地址：{baseUrl}{voiceId}/{version}/{fileName}。
+        /// 构造下载地址：{baseUrl}{voiceId}/{完整版本}/{fileName}。
+        /// 版本目录使用原始版本字符串（URL 转义），例如 2.2.0 Cross-Lingual，
+        /// 规范化后的 X.Y.Z 仅用于排序与本地分组，不能用于下载。
         /// </summary>
         public Uri GetDownloadUri(TsnVoiceCatalogEntry voice, TsnVoiceCatalogVersion version) {
             string baseUrl = DownloadBaseUrl;
             if (!baseUrl.EndsWith("/")) {
                 baseUrl += "/";
             }
-            return new Uri(baseUrl + voice.Id + "/" + version.Version + "/"
-                + version.FileName, UriKind.Absolute);
+            string label = string.IsNullOrEmpty(version.Label)
+                ? version.Version
+                : version.Label;
+            return new Uri(baseUrl + voice.Id + "/" + Uri.EscapeDataString(label)
+                + "/" + version.FileName, UriKind.Absolute);
         }
 
         /// <summary>
