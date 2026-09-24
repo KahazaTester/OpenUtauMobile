@@ -31,7 +31,10 @@ namespace OpenUtau.Core.TsnVoice {
             Log.Information("TsnVoice 扫描到 {Count} 个语音", voices.Count);
             foreach (TsnVoiceRecord record in voices) {
                 try {
-                    singers.Add(new TsnVoiceSinger(record));
+                    TsnVoiceSinger singer = new TsnVoiceSinger(record);
+                    // 扫描时即加载立绘字节，下载后无需重启即可显示。
+                    singer.EnsureAvatarLoaded();
+                    singers.Add(singer);
                 } catch (Exception e) {
                     Log.Error(e, "无法加载 TsnVoice 歌手 {File}", record.SourcePath);
                 }
@@ -52,7 +55,9 @@ namespace OpenUtau.Core.TsnVoice {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
                     "无法加载 TsnVoice 歌手：" + filePath + "（" + detail + "）");
             }
-            return new TsnVoiceSinger(voices[0]);
+            TsnVoiceSinger singer = new TsnVoiceSinger(voices[0]);
+            singer.EnsureAvatarLoaded();
+            return singer;
         }
     }
 }

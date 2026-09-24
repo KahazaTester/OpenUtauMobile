@@ -220,6 +220,8 @@ public class TsnVoiceVoiceItemViewModel : ReactiveObject
                 CancellationToken.None);
             ToastService.Enqueue(string.Format(
                 L.S("TsnVoice.DownloadSuccess"), entry.Name, version.Label));
+            AvatarBitmap = null;
+            LoadPortrait();
         }
         catch (Exception ex)
         {

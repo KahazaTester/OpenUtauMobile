@@ -69,11 +69,21 @@ namespace OpenUtau.Core.TsnVoice {
                     if (result.samples == null) {
                         try {
                             result.samples = InvokeTsnVoice(phrase, progress,
-                                progressInfo, cancellation, pitchPath);
+                                progressInfo, cancellation, pitchPath,
+                                out int reported);
+                            progress.Complete(
+                                Math.Max(0, phrase.phones.Length - reported),
+                                progressInfo);
                         } catch (TsnVoiceException e) when (
                             e.Status == TsnVoiceStatus.Cancelled
                             || cancellation.IsCancellationRequested) {
                             return result;
+                        } catch (OutOfMemoryException e) {
+                            Log.Error(e, "TsnVoice 内存不足，已清理缓存");
+                            TsnVoiceInference.DropCache();
+                            GC.Collect();
+                            throw new TsnVoiceException(TsnVoiceStatus.ModelError,
+                                "内存不足，语音过长或同时渲染过多，已清理缓存，请重试", e);
                         }
                         if (result.samples != null) {
                             try {
@@ -86,7 +96,6 @@ namespace OpenUtau.Core.TsnVoice {
                     if (result.samples != null) {
                         Renderers.ApplyDynamics(phrase, result);
                     }
-                    progress.Complete(phrase.phones.Length, progressInfo);
                     return result;
             });
             return task;
@@ -94,7 +103,7 @@ namespace OpenUtau.Core.TsnVoice {
 
         float[] InvokeTsnVoice(RenderPhrase phrase, Progress progress,
             string progressInfo, CancellationTokenSource cancellation,
-            string pitchPath) {
+            string pitchPath, out int progressReported) {
             TsnVoiceSinger singer = phrase.singer as TsnVoiceSinger;
             if (singer == null) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
@@ -105,14 +114,14 @@ namespace OpenUtau.Core.TsnVoice {
                 TsnVoiceInference.GetVoiceHandle(singer.Location);
             lock (handle.SyncRoot) {
                 return InvokeTsnVoiceLocked(handle, singer, phrase, progress,
-                    progressInfo, cancellation, pitchPath);
+                    progressInfo, cancellation, pitchPath, out progressReported);
             }
         }
 
         float[] InvokeTsnVoiceLocked(TsnVoiceInference.TsnVoiceVoiceHandle handle,
             TsnVoiceSinger singer, RenderPhrase phrase, Progress progress,
             string progressInfo, CancellationTokenSource cancellation,
-            string pitchPath) {
+            string pitchPath, out int progressReported) {
             TsnVoicePackage package = handle.Package;
             string language = singer.PrimaryLanguage();
             Log.Information(
@@ -166,11 +175,20 @@ namespace OpenUtau.Core.TsnVoice {
             }
             List<TsnVoicePitchPoint> pitch = SamplePitch(phrase, firstMs);
             List<TsnVoiceControlPoint> controls = SampleControls(phrase, firstMs);
+            int lastProgress = 0;
+            progressReported = 0;
             TsnVoiceSynthesisOutput output = TsnVoiceInference.Synthesize(
                 package, notes, pitch, controls,
                 () => cancellation.IsCancellationRequested,
-                (value, stage) => progress.Complete(0, progressInfo + " " + stage),
+                (value, stage) => {
+                    int current = Math.Clamp((int)(value * phrase.phones.Length),
+                        0, phrase.phones.Length);
+                    int delta = current - lastProgress;
+                    lastProgress = current;
+                    progress.Complete(delta, progressInfo + " " + stage);
+                },
                 null);
+            progressReported = lastProgress;
             if (output.Samples.Length == 0) {
                 throw new TsnVoiceException(TsnVoiceStatus.ModelError,
                     "TsnVoice 合成未返回音频");
@@ -289,6 +307,11 @@ namespace OpenUtau.Core.TsnVoice {
                             writer.Write((float)point.MidiPitch);
                         }
                     }
+                }
+                if (output.Pitch.Count == 0) {
+                    Log.Warning("TsnVoice 未产生有效音高点，自动音高曲线为空");
+                } else {
+                    Log.Information("TsnVoice 音高缓存：{Count} 个点", output.Pitch.Count);
                 }
             } catch (Exception e) {
                 Log.Warning(e, "写入 TsnVoice 音高缓存失败");

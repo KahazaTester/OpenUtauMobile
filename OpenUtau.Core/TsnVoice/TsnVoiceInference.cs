@@ -143,6 +143,24 @@ namespace OpenUtau.Core.TsnVoice {
         static readonly object cacheLock = new object();
         static readonly LinkedList<CachedVoice> cache = new LinkedList<CachedVoice>();
 
+        /// <summary>
+        /// 清空会话缓存并回收内存，供内存不足时恢复。
+        /// </summary>
+        public static void DropCache() {
+            lock (cacheLock) {
+                foreach (CachedVoice cached in cache) {
+                    foreach (KeyValuePair<string, SessionEntry> session in
+                        cached.Handle.Sessions) {
+                        try {
+                            session.Value.Session.Dispose();
+                        } catch {
+                        }
+                    }
+                }
+                cache.Clear();
+            }
+        }
+
         static string CacheKey(string path) {
             FileInfo info = new FileInfo(path);
             return path + "\n" + info.Length + "\n" + info.LastWriteTimeUtc.Ticks;
@@ -352,7 +370,8 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         // 张量分段运行，对应 run_fixed_segments / run_overlapped_segments。
-        static float[,] RunFixedSegments(SessionEntry model, float[,] input) {
+        static float[,] RunFixedSegments(SessionEntry model, float[,] input,
+            Action<double> fraction = null) {
             int rows = input.GetLength(0);
             int columns = input.GetLength(1);
             if (rows == 0 || columns == 0 || model.Session.InputMetadata.Count != 1
@@ -393,12 +412,13 @@ namespace OpenUtau.Core.TsnVoice {
                         result[start + row, column] = output[row * outputDimensions + column];
                     }
                 }
+                fraction?.Invoke((start + actual) / (double)rows);
             }
             return result;
         }
 
         static float[,] RunOverlappedSegments(SessionEntry model, float[,] input,
-            int overlapFrames) {
+            int overlapFrames, Action<double> fraction = null) {
             int rows = input.GetLength(0);
             int columns = input.GetLength(1);
             if (rows == 0 || columns == 0 || model.Session.InputMetadata.Count != 1
@@ -423,49 +443,70 @@ namespace OpenUtau.Core.TsnVoice {
             int stride = window - 2 * overlapFrames;
             int outputDimensions = outputShape[2];
             int segmentCount = (rows + stride - 1) / stride;
-            List<float[,]> segments = new List<float[,]>(segmentCount);
+            // 流式混合：数值与原生实现完全一致（相同窗口、相同权重），
+            // 但任意时刻最多保留 3 个窗口，长乐句不再一次性持有全部分段。
+            Dictionary<int, float[,]> segmentCache = new Dictionary<int, float[,]>();
             float[] feedValues = new float[window * columns];
-            for (int segmentIndex = 0; segmentIndex < segmentCount; segmentIndex++) {
-                int coreStart = segmentIndex * stride;
-                for (int row = 0; row < window; row++) {
-                    int source = Math.Clamp(coreStart + row - overlapFrames, 0, rows - 1);
-                    for (int column = 0; column < columns; column++) {
-                        feedValues[row * columns + column] = input[source, column];
+            float[,] GetSegment(int segmentIndex) {
+                if (!segmentCache.TryGetValue(segmentIndex, out float[,] cached)) {
+                    int coreStart = segmentIndex * stride;
+                    for (int row = 0; row < window; row++) {
+                        int source = Math.Clamp(coreStart + row - overlapFrames, 0, rows - 1);
+                        for (int column = 0; column < columns; column++) {
+                            feedValues[row * columns + column] = input[source, column];
+                        }
                     }
-                }
-                float[] output = RunModel(model, inputName,
-                    feedValues, new int[] { 1, window, columns });
-                if (output.Length != window * outputDimensions) {
-                    throw new TsnVoiceException(TsnVoiceStatus.ModelError,
-                        "模型返回了不符合预期的输出形状");
-                }
-                float[,] values = new float[window, outputDimensions];
-                for (int row = 0; row < window; row++) {
-                    for (int column = 0; column < outputDimensions; column++) {
-                        values[row, column] = output[row * outputDimensions + column];
+                    float[] output = RunModel(model, inputName,
+                        feedValues, new int[] { 1, window, columns });
+                    if (output.Length != window * outputDimensions) {
+                        throw new TsnVoiceException(TsnVoiceStatus.ModelError,
+                            "模型返回了不符合预期的输出形状");
                     }
+                    cached = new float[window, outputDimensions];
+                    for (int row = 0; row < window; row++) {
+                        for (int column = 0; column < outputDimensions; column++) {
+                            cached[row, column] = output[row * outputDimensions + column];
+                        }
+                    }
+                    segmentCache[segmentIndex] = cached;
+                    fraction?.Invoke((segmentIndex + 1.0) / segmentCount);
                 }
-                segments.Add(values);
+                return cached;
             }
             float[,] result = new float[rows, outputDimensions];
+            int lastSegment = -1;
             for (int frame = 0; frame < rows; frame++) {
                 int segmentIndex = frame / stride;
+                if (segmentIndex != lastSegment) {
+                    // 滑窗前移：丢弃已不可能再被引用的旧窗口。
+                    List<int> stale = new List<int>();
+                    foreach (int key in segmentCache.Keys) {
+                        if (key < segmentIndex - 1) {
+                            stale.Add(key);
+                        }
+                    }
+                    foreach (int key in stale) {
+                        segmentCache.Remove(key);
+                    }
+                    lastSegment = segmentIndex;
+                }
                 int coreStart = segmentIndex * stride;
                 int withinCore = frame - coreStart;
                 int currentRow = withinCore + overlapFrames;
+                float[,] current = GetSegment(segmentIndex);
                 for (int column = 0; column < outputDimensions; column++) {
-                    result[frame, column] = segments[segmentIndex][currentRow, column];
+                    result[frame, column] = current[currentRow, column];
                 }
                 if (segmentIndex > 0 && withinCore < overlapFrames) {
                     double weight = 0.5 + (double)withinCore / (2 * overlapFrames);
-                    BlendRow(result, frame, segments[segmentIndex - 1],
+                    BlendRow(result, frame, GetSegment(segmentIndex - 1),
                         currentRow + stride, weight, outputDimensions);
                 } else {
                     int coreLength = Math.Min(stride, rows - coreStart);
                     int remaining = coreLength - withinCore;
                     if (segmentIndex + 1 < segmentCount && remaining < overlapFrames) {
                         double weight = 0.5 + (double)remaining / (2 * overlapFrames);
-                        BlendRow(result, frame, segments[segmentIndex + 1],
+                        BlendRow(result, frame, GetSegment(segmentIndex + 1),
                             currentRow - stride, weight, outputDimensions);
                     }
                 }

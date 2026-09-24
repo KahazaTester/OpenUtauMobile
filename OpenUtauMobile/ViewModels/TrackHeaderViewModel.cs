@@ -1,5 +1,6 @@
 using OpenUtauMobile.Services.Tracks;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -142,6 +143,12 @@ public class TrackHeaderViewModel : ViewModelBase, IDisposable
             DocManager.Inst.ExecuteCmd(new TrackChangeRenderSettingCommand(DocManager.Inst.Project, _track, settings));
         }
 
+        // TsnVoice 参数曲线：选中歌手时自动补齐 ALP/HUS，用户可直接绘制
+        if (singer.Found && singer.SingerType == USingerType.TsnVoice)
+        {
+            EnsureTsnVoiceExpressions();
+        }
+
         // 
         DocManager.Inst.ExecuteCmd(new VoiceColorRemappingNotification(_track.TrackNo, true));
         DocManager.Inst.EndUndoGroup();
@@ -159,6 +166,41 @@ public class TrackHeaderViewModel : ViewModelBase, IDisposable
         Preferences.Save();
 
         Refresh();
+    }
+
+    /// <summary>
+    /// 为 TsnVoice 轨道补齐缺失的建议参数曲线（ALP/HUS），已存在的不动。
+    /// </summary>
+    private void EnsureTsnVoiceExpressions()
+    {
+        try
+        {
+            UProject project = DocManager.Inst.Project;
+            IRenderer? renderer = _track.RendererSettings.Renderer;
+            UExpressionDescriptor[]? suggested =
+                renderer?.GetSuggestedExpressions(_track.Singer, _track.RendererSettings);
+            if (suggested == null || suggested.Length == 0)
+            {
+                return;
+            }
+            List<UExpressionDescriptor> missing = suggested
+                .Where(d => d != null && !project.expressions.ContainsKey(d.abbr))
+                .Select(d => d.Clone())
+                .ToList();
+            if (missing.Count == 0)
+            {
+                return;
+            }
+            List<UExpressionDescriptor> descriptors = project.expressions.Values.ToList();
+            descriptors.AddRange(missing);
+            DocManager.Inst.ExecuteCmd(new ConfigureExpressionsCommand(project, descriptors.ToArray()));
+            Log.Information("已为 TsnVoice 轨道补齐参数曲线：{Abbrs}",
+                string.Join(", ", missing.Select(d => d.abbr)));
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "补齐 TsnVoice 参数曲线失败");
+        }
     }
 
     private async Task SelectPhonemizer()

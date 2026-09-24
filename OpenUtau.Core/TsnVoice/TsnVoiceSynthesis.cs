@@ -831,7 +831,7 @@ namespace OpenUtau.Core.TsnVoice {
 
         static float[,] LegacyLinguisticFeatures(TsnVoicePackage voice,
             Dictionary<string, SessionEntry> sessions, PreparedScore score,
-            out float[,] frameContext) {
+            out float[,] frameContext, Action<double> fraction = null) {
             SessionEntry model = GetModel(sessions, "linguistic");
             int statePhonemeDimensions = ModelInputDimensions(model);
             int totalDimensions = statePhonemeDimensions + 5;
@@ -864,12 +864,13 @@ namespace OpenUtau.Core.TsnVoice {
                     }
                 }
             }
-            return RunFixedSegments(model, contexts);
+            return RunFixedSegments(model, contexts, fraction);
         }
 
         static float[,] ModernLinguisticFeatures(TsnVoicePackage voice,
             Dictionary<string, SessionEntry> sessions, PreparedScore score,
-            string language, out float[,] frameContext) {
+            string language, out float[,] frameContext,
+            Action<double> fraction = null) {
             SessionEntry uniqueModel = GetModel(sessions, "unique_context:" + language);
             int uniqueDimensions = ModelInputDimensions(uniqueModel);
             TsnVoiceBinaryQuestions uniqueQuestions = TsnVoiceBinaryQuestions.Parse(
@@ -882,7 +883,8 @@ namespace OpenUtau.Core.TsnVoice {
                     uniqueContext[phone, i] = compiled[i];
                 }
             }
-            float[,] uniqueEmbedding = RunFixedSegments(uniqueModel, uniqueContext);
+            float[,] uniqueEmbedding = RunFixedSegments(uniqueModel, uniqueContext,
+                f => fraction?.Invoke(f * 0.2));
             SessionEntry commonModel = GetModel(sessions, "common_context");
             int commonDimensions = ModelInputDimensions(commonModel);
             TsnVoiceContextQuestions commonQuestions = TsnVoiceContextQuestions.Parse(
@@ -912,16 +914,19 @@ namespace OpenUtau.Core.TsnVoice {
                     }
                 }
             }
-            float[,] commonEmbedding = RunFixedSegments(commonModel, commonContext);
+            float[,] commonEmbedding = RunFixedSegments(commonModel, commonContext,
+                f => fraction?.Invoke(0.2 + f * 0.4));
             float[,] linguisticInput = ConcatenateColumns(new List<float[,]> {
                 repeatedUnique, commonEmbedding,
             });
-            return RunFixedSegments(GetModel(sessions, "linguistic"), linguisticInput);
+            return RunFixedSegments(GetModel(sessions, "linguistic"), linguisticInput,
+                f => fraction?.Invoke(0.6 + f * 0.4));
         }
 
         static void RunAcousticModels(TsnVoicePackage voice,
             Dictionary<string, SessionEntry> sessions, PreparedScore score,
             float[,] linguistic, float[,] frameContext,
+            Action<double> stage1Fraction, Action<double> stage2Fraction,
             out float[,] stage1, out float[,] stage2) {
             int frames = score.Duration.FrameCount;
             float[,] lf0Context = new float[frames, 1];
@@ -943,7 +948,7 @@ namespace OpenUtau.Core.TsnVoice {
                     "组装的 CNN1 输入维度错误");
             }
             stage1 = RunOverlappedSegments(GetModel(sessions, "acoustic_stage1"),
-                stage1Input, 100);
+                stage1Input, 100, stage1Fraction);
             float[,] stage2Input = ConcatenateColumns(new List<float[,]> {
                 stage1, stage1Input,
             });
@@ -954,7 +959,7 @@ namespace OpenUtau.Core.TsnVoice {
                     "组装的 CNN2 输入维度错误");
             }
             stage2 = RunOverlappedSegments(GetModel(sessions, "acoustic_stage2"),
-                stage2Input, 100);
+                stage2Input, 100, stage2Fraction);
         }
 
         static void ApplyPitchConstraints(PreparedScore score,
@@ -1126,7 +1131,8 @@ namespace OpenUtau.Core.TsnVoice {
 
         static double[] RenderPrenet(TsnVoicePackage voice,
             Dictionary<string, SessionEntry> sessions,
-            TsnVoiceAcousticParameters acoustic, double[] rawExcitation) {
+            TsnVoiceAcousticParameters acoustic, double[] rawExcitation,
+            Action<double> fraction = null) {
             Dictionary<string, string> config = voice.VocoderConfig;
             int segment = ConfigSize(config, "SEGMENT_LENGTH", 0, true);
             int left = ConfigSize(config, "LEFT_MARGIN_LENGTH", 0, true);
@@ -1200,6 +1206,7 @@ namespace OpenUtau.Core.TsnVoice {
                 foreach (float value in output) {
                     result.Add(value);
                 }
+                fraction?.Invoke((center + stride) / (double)paddedFrames);
             }
             while (result.Count > rawExcitation.Length) {
                 result.RemoveAt(result.Count - 1);
@@ -1314,16 +1321,20 @@ namespace OpenUtau.Core.TsnVoice {
             float[,] linguistic;
             if (voice.LegacyContextLayout) {
                 linguistic = LegacyLinguisticFeatures(voice, sessions, score,
-                    out frameContext);
+                    out frameContext,
+                    f => reportProgress(0.12f + (float)(0.22 * f), "linguistic"));
             } else {
                 linguistic = ModernLinguisticFeatures(voice, sessions, score,
-                    notes[0].Language, out frameContext);
+                    notes[0].Language, out frameContext,
+                    f => reportProgress(0.12f + (float)(0.22 * f), "linguistic"));
             }
             reportProgress(0.34f, "linguistic");
             if (isCancelled()) {
                 throw new TsnVoiceException(TsnVoiceStatus.Cancelled, "合成已取消");
             }
             RunAcousticModels(voice, sessions, score, linguistic, frameContext,
+                f => reportProgress(0.34f + (float)(0.15 * f), "acoustic"),
+                f => reportProgress(0.49f + (float)(0.15 * f), "acoustic"),
                 out float[,] stage1, out float[,] stage2);
             TsnVoiceAcousticParameters acoustic = TsnVoiceAcoustic.Postprocess(
                 voice, stage1, stage2,
@@ -1350,7 +1361,8 @@ namespace OpenUtau.Core.TsnVoice {
             }
             double[] raw = TsnVoiceDsp.GenerateRawExcitation(acoustic.Lf0,
                 acoustic.Bap, sampleRate, framePeriod, defaultAlpha);
-            double[] enhanced = RenderPrenet(voice, sessions, acoustic, raw);
+            double[] enhanced = RenderPrenet(voice, sessions, acoustic, raw,
+                f => reportProgress(0.64f + (float)(0.30 * f), "vocoder"));
             int pade = ConfigSize(voice.Config, "PADE_ORDER", 0, true);
             double[] pcm = TsnVoiceDsp.FilterMgcExcitation(enhanced, acoustic.Mgc,
                 framePeriod, alpha, pade);
