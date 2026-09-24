@@ -245,7 +245,8 @@ namespace OpenUtau.Core.TsnVoice {
                             float tick = phrase.timeAxis.MsPosToTickPos(ms)
                                 - phrase.position;
                             writer.Write(tick);
-                            writer.Write((float)(point.MidiPitch * 100.0));
+                            // RenderPitchResult.tones 为 MIDI 半音，调用端自行换算为音分。
+                            writer.Write((float)point.MidiPitch);
                         }
                     }
                 }

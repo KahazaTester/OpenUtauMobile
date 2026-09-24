@@ -337,6 +337,10 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 float[] output = RunModel(model, inputName,
                     feedValues, new int[] { 1, segment, columns });
+                if (output.Length != segment * outputDimensions) {
+                    throw new TsnVoiceException(TsnVoiceStatus.ModelError,
+                        "模型返回了不符合预期的输出形状");
+                }
                 for (int row = 0; row < actual; row++) {
                     for (int column = 0; column < outputDimensions; column++) {
                         result[start + row, column] = output[row * outputDimensions + column];
@@ -384,6 +388,10 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 float[] output = RunModel(model, inputName,
                     feedValues, new int[] { 1, window, columns });
+                if (output.Length != window * outputDimensions) {
+                    throw new TsnVoiceException(TsnVoiceStatus.ModelError,
+                        "模型返回了不符合预期的输出形状");
+                }
                 float[,] values = new float[window, outputDimensions];
                 for (int row = 0; row < window; row++) {
                     for (int column = 0; column < outputDimensions; column++) {

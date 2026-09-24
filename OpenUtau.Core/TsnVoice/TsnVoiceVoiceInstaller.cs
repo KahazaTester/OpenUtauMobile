@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -47,30 +48,75 @@ namespace OpenUtau.Core.TsnVoice {
                 return null;
             }
             try {
-                using (FileStream stream = new FileStream(metadataPath,
-                    FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                    return JsonSerializer.Deserialize<TsnVoiceInstallMetadata>(stream);
+                string json = File.ReadAllText(metadataPath, Encoding.UTF8);
+                using (JsonDocument document = JsonDocument.Parse(json)) {
+                    JsonElement root = document.RootElement;
+                    TsnVoiceInstallMetadata metadata = new TsnVoiceInstallMetadata();
+                    metadata.VoiceId = GetField(root, "VoiceId");
+                    metadata.Version = GetField(root, "Version");
+                    metadata.Label = GetField(root, "Label");
+                    metadata.FileName = GetField(root, "FileName");
+                    metadata.Md5 = GetField(root, "Md5");
+                    return metadata;
                 }
             } catch {
                 return null;
             }
         }
 
+        static string GetField(JsonElement root, string name) {
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty(name, out JsonElement value)
+                && value.ValueKind == JsonValueKind.String) {
+                return value.GetString() ?? string.Empty;
+            }
+            return string.Empty;
+        }
+
+        static string EscapeJson(string value) {
+            StringBuilder builder = new StringBuilder(value.Length + 2);
+            foreach (char c in value) {
+                switch (c) {
+                    case '"':
+                        builder.Append("\\\"");
+                        break;
+                    case '\\':
+                        builder.Append("\\\\");
+                        break;
+                    case '\n':
+                        builder.Append("\\n");
+                        break;
+                    case '\r':
+                        builder.Append("\\r");
+                        break;
+                    case '\t':
+                        builder.Append("\\t");
+                        break;
+                    default:
+                        if (c < 0x20) {
+                            builder.Append("\\u");
+                            builder.Append(((int)c).ToString("x4"));
+                        } else {
+                            builder.Append(c);
+                        }
+                        break;
+                }
+            }
+            return builder.ToString();
+        }
+
         void WriteMetadata(TsnVoiceCatalog catalog, TsnVoiceCatalogEntry voice,
             TsnVoiceCatalogVersion version) {
-            TsnVoiceInstallMetadata metadata = new TsnVoiceInstallMetadata();
-            metadata.VoiceId = voice.Id;
-            metadata.Version = version.Version;
-            metadata.Label = version.Label;
-            metadata.FileName = version.FileName;
-            metadata.Md5 = version.Md5;
+            // 手工拼装 JSON，避免反射序列化在裁剪/AOT 下不可用。
+            string json = "{\"VoiceId\":\"" + EscapeJson(voice.Id)
+                + "\",\"Version\":\"" + EscapeJson(version.Version)
+                + "\",\"Label\":\"" + EscapeJson(version.Label)
+                + "\",\"FileName\":\"" + EscapeJson(version.FileName)
+                + "\",\"Md5\":\"" + EscapeJson(version.Md5) + "\"}";
             string metadataPath = MetadataPath(
                 catalog.GetInstallPath(voice, version, VoiceRoot));
             string temporary = metadataPath + ".tmp";
-            using (FileStream stream = new FileStream(temporary,
-                FileMode.Create, FileAccess.Write, FileShare.None)) {
-                JsonSerializer.Serialize(stream, metadata);
-            }
+            File.WriteAllText(temporary, json, Encoding.UTF8);
             File.Move(temporary, metadataPath, true);
         }
 

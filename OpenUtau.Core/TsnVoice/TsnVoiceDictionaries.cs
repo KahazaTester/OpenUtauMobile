@@ -78,7 +78,9 @@ namespace OpenUtau.Core.TsnVoice {
         /// </summary>
         public static string GetDictionaryText(params string[] parts) {
             string text = Encoding.UTF8.GetString(GetDictionaryBytes(parts));
-            if (text.StartsWith("\uFEFF")) {
+            // 注意：必须使用 Ordinal 比较。U+FEFF 在语言比较中是可忽略字符，
+            // 默认的 StartsWith("\uFEFF") 会对任意字符串返回 true 并吃掉首字符。
+            if (text.StartsWith("\uFEFF", StringComparison.Ordinal)) {
                 text = text.Substring(1);
             }
             return text;
@@ -114,14 +116,6 @@ namespace OpenUtau.Core.TsnVoice {
             return ReadEmbedded("TsnVoice.Voice." + Dotted(parts));
         }
 
-        public static string GetVoiceText(params string[] parts) {
-            string text = Encoding.UTF8.GetString(GetVoiceBytes(parts));
-            if (text.StartsWith("\uFEFF")) {
-                text = text.Substring(1);
-            }
-            return text;
-        }
-
         /// <summary>
         /// 按行解析“键 值1 值2...”表格文本。
         /// </summary>
@@ -130,16 +124,19 @@ namespace OpenUtau.Core.TsnVoice {
             List<KeyValuePair<string, List<string>>> result =
                 new List<KeyValuePair<string, List<string>>>();
             HashSet<string> keys = new HashSet<string>(StringComparer.Ordinal);
+            int lineNumber = 0;
             foreach (string rawLine in text.Split('\n')) {
                 string line = rawLine.Trim();
                 if (line.Length == 0) {
                     continue;
                 }
+                lineNumber++;
                 string[] columns = line.Split(
                     new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
                 if (columns.Length < 2 || !keys.Add(columns[0])) {
                     throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
-                        "无效或重复的词典条目：" + what);
+                        "无效或重复的词典条目：" + what + " 第 " + lineNumber
+                        + " 行（" + line + "）");
                 }
                 List<string> values = new List<string>();
                 for (int i = 1; i < columns.Length; i++) {
@@ -161,11 +158,12 @@ namespace OpenUtau.Core.TsnVoice {
                 if (line.Length == 0) {
                     continue;
                 }
+                // 与原生一致：取前两列，多余列忽略。
                 string[] columns = line.Split(
                     new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (columns.Length != 2 || result.ContainsKey(columns[0])) {
+                if (columns.Length < 2 || result.ContainsKey(columns[0])) {
                     throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
-                        "无效或重复的表格条目：" + what);
+                        "无效或重复的表格条目：" + what + "（" + line + "）");
                 }
                 result[columns[0]] = columns[1];
             }

@@ -52,6 +52,9 @@ public class TsnVoiceManagerViewModel : ReactiveObject
         catch (Exception ex)
         {
             ErrorMessage = string.Format(L.S("TsnVoice.LoadFailed"), ex.Message);
+            Serilog.Log.Error(ex, "TSNVOICE 目录加载失败");
+            ToastService.Enqueue(string.Format(L.S("TsnVoice.LoadFailed"),
+                ex.GetType().Name + ": " + ex.Message));
         }
         finally
         {

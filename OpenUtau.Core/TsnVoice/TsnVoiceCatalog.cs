@@ -135,15 +135,19 @@ namespace OpenUtau.Core.TsnVoice {
 
         static TsnVoiceCatalog Load() {
             TsnVoiceCatalog catalog = new TsnVoiceCatalog();
-            string json;
+            byte[] data;
             try {
-                json = TsnVoiceDictionaries.GetVoiceText("catalog.json");
+                data = TsnVoiceDictionaries.GetVoiceBytes("catalog.json");
             } catch (Exception e) {
                 throw new TsnVoiceException(TsnVoiceStatus.IoError,
                     "无法读取内嵌语音目录", e);
             }
+            if (data == null || data.Length == 0) {
+                throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                    "语音目录为空");
+            }
             try {
-                using (JsonDocument document = JsonDocument.Parse(json)) {
+                using (JsonDocument document = JsonDocument.Parse(data)) {
                     JsonElement root = document.RootElement;
                     catalog.DownloadBaseUrl = GetString(root, "downloadBaseUrl");
                     if (!root.TryGetProperty("voices", out JsonElement voices)

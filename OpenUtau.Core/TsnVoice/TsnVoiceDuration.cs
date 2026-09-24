@@ -135,7 +135,8 @@ namespace OpenUtau.Core.TsnVoice {
                 if (line.Length == 0) {
                     continue;
                 }
-                if (line.StartsWith("[") && line.EndsWith("]")) {
+                if (line.StartsWith("[", StringComparison.Ordinal)
+                    && line.EndsWith("]", StringComparison.Ordinal)) {
                     section = line.Substring(1, line.Length - 2);
                     continue;
                 }
@@ -186,7 +187,8 @@ namespace OpenUtau.Core.TsnVoice {
 
         static string Unquote(string value) {
             value = value.Trim();
-            if (value.Length >= 2 && value.StartsWith("\"") && value.EndsWith("\"")) {
+            if (value.Length >= 2 && value.StartsWith("\"", StringComparison.Ordinal)
+                && value.EndsWith("\"", StringComparison.Ordinal)) {
                 return value.Substring(1, value.Length - 2);
             }
             return value;
@@ -201,7 +203,7 @@ namespace OpenUtau.Core.TsnVoice {
                 if (line.Length == 0) {
                     continue;
                 }
-                if (line.StartsWith("QS ")) {
+                if (line.StartsWith("QS ", StringComparison.Ordinal)) {
                     int brace = line.IndexOf('{');
                     int close = line.LastIndexOf('}');
                     if (brace < 0 || close <= brace) {

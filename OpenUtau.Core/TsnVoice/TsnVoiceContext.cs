@@ -273,7 +273,7 @@ namespace OpenUtau.Core.TsnVoice {
                 new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (string rawLine in text.Split('\n')) {
                 string line = rawLine.Trim();
-                if (line.Length == 0 || line.StartsWith("#")) {
+                if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal)) {
                     continue;
                 }
                 Question question = new Question();
@@ -474,7 +474,7 @@ namespace OpenUtau.Core.TsnVoice {
             TsnVoiceBinaryQuestions result = new TsnVoiceBinaryQuestions();
             foreach (string rawLine in text.Split('\n')) {
                 string line = rawLine.Trim();
-                if (line.Length == 0 || line.StartsWith("#")) {
+                if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal)) {
                     continue;
                 }
                 int open = line.IndexOf('{');

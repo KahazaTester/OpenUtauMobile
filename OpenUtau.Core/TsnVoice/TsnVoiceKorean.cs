@@ -82,13 +82,20 @@ namespace OpenUtau.Core.TsnVoice {
                     int.Parse(entry.Substring(colon + 1).Trim());
             }
             result.neutral = ParseStringMap(Require(config, "FINAL_NEUTRALIZATION"));
-            result.hAssimilation = ParsePairRules(Require(config, "H_ASSIMILATION_RULES"));
-            result.nasalization = ParsePairRules(Require(config, "NASALIZATION_RULES"));
-            result.liquidization = ParsePairRules(Require(config, "LIQUIDIZATION_RULES"));
-            result.initialAspiration = ParsePairRules(Require(config, "INITIAL_ASPIRATION_RULES"));
-            result.finalAspiration = ParsePairRules(Require(config, "FINAL_ASPIRATION_RULES"));
-            result.fortification = ParsePairRules(Require(config, "FORTIFICATION_RULES"));
-            result.palatalization = ParsePairRules(Require(config, "DT_PALATALIZATION_RULES"));
+            result.hAssimilation = ParsePairRules("H_ASSIMILATION_RULES",
+                Require(config, "H_ASSIMILATION_RULES"));
+            result.nasalization = ParsePairRules("NASALIZATION_RULES",
+                Require(config, "NASALIZATION_RULES"));
+            result.liquidization = ParsePairRules("LIQUIDIZATION_RULES",
+                Require(config, "LIQUIDIZATION_RULES"));
+            result.initialAspiration = ParsePairRules("INITIAL_ASPIRATION_RULES",
+                Require(config, "INITIAL_ASPIRATION_RULES"));
+            result.finalAspiration = ParsePairRules("FINAL_ASPIRATION_RULES",
+                Require(config, "FINAL_ASPIRATION_RULES"));
+            result.fortification = ParsePairRules("FORTIFICATION_RULES",
+                Require(config, "FORTIFICATION_RULES"));
+            result.palatalization = ParsePalatalizationRules("DT_PALATALIZATION_RULES",
+                Require(config, "DT_PALATALIZATION_RULES"));
             foreach (string item in Require(config, "S_PALATALIZATION_MEDIALS").Split(',')) {
                 result.sMedials.Add(item.Trim());
             }
@@ -159,18 +166,21 @@ namespace OpenUtau.Core.TsnVoice {
             return result;
         }
 
-        static Dictionary<string, KeyValuePair<string, string>> ParsePairRules(string value) {
+        static Dictionary<string, KeyValuePair<string, string>> ParsePairRules(
+            string ruleKey, string value) {
             Dictionary<string, KeyValuePair<string, string>> result =
                 new Dictionary<string, KeyValuePair<string, string>>(StringComparer.Ordinal);
             foreach (string entry in SplitRule(value, ';')) {
                 int colon = entry.IndexOf(':');
                 if (colon < 0) {
-                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice, "无效的韩语音系规则");
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        "韩语规则缺少冒号：" + ruleKey + "（" + entry + "）");
                 }
                 List<string> left = SplitRule(entry.Substring(0, colon), ',');
                 List<string> right = SplitRule(entry.Substring(colon + 1), ',');
                 if (left.Count != 2 || right.Count != 2) {
-                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice, "无效的韩语音系规则");
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        "韩语音系规则格式错误：" + ruleKey + "（" + entry + "）");
                 }
                 string key = left[0] + "\n" + left[1];
                 KeyValuePair<string, string> mapped = new KeyValuePair<string, string>(
@@ -178,6 +188,35 @@ namespace OpenUtau.Core.TsnVoice {
                     right[1] == "-" ? string.Empty : right[1]);
                 if (result.ContainsKey(key)) {
                     throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice, "重复的韩语音系规则");
+                }
+                result[key] = mapped;
+            }
+            return result;
+        }
+
+        static Dictionary<string, KeyValuePair<string, string>> ParsePalatalizationRules(
+            string ruleKey, string value) {
+            Dictionary<string, KeyValuePair<string, string>> result =
+                new Dictionary<string, KeyValuePair<string, string>>(StringComparer.Ordinal);
+            foreach (string entry in SplitRule(value, ';')) {
+                int colon = entry.IndexOf(':');
+                if (colon < 0) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        "韩语规则缺少冒号：" + ruleKey + "（" + entry + "）");
+                }
+                List<string> left = SplitRule(entry.Substring(0, colon), ',');
+                List<string> right = SplitRule(entry.Substring(colon + 1), ',');
+                if (left.Count != 3 || right.Count != 2) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        "韩语腭化规则格式错误：" + ruleKey + "（" + entry + "）");
+                }
+                string key = left[0] + "\n" + left[1] + "\n" + left[2];
+                KeyValuePair<string, string> mapped = new KeyValuePair<string, string>(
+                    right[0] == "-" ? string.Empty : right[0],
+                    right[1] == "-" ? string.Empty : right[1]);
+                if (result.ContainsKey(key)) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        "重复的韩语音系规则：" + ruleKey + "（" + entry + "）");
                 }
                 result[key] = mapped;
             }
