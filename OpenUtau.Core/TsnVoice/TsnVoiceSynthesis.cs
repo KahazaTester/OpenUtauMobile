@@ -1196,11 +1196,11 @@ namespace OpenUtau.Core.TsnVoice {
                     "声码器输入张量与配置不匹配");
             }
             List<double> result = new List<double>(paddedFrames * framePeriod);
+            float[] sampleFeed = new float[segment * framePeriod];
+            float[] frameFeed = new float[segment * latentColumns];
             for (int center = 0; center < paddedFrames; center += stride) {
-                float[] sampleFeed = new float[segment * framePeriod];
                 Array.Copy(excitationPadded, center * framePeriod, sampleFeed, 0,
                     sampleFeed.Length);
-                float[] frameFeed = new float[segment * latentColumns];
                 for (int frame = 0; frame < segment; frame++) {
                     for (int i = 0; i < latentColumns; i++) {
                         frameFeed[frame * latentColumns + i] =

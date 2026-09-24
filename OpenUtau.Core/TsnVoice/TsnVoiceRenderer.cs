@@ -128,10 +128,8 @@ namespace OpenUtau.Core.TsnVoice {
                 new HashSet<string>(singer.Record.Languages.Split(
                     new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
                     StringComparer.Ordinal);
-            double firstMs = phrase.notes[0].positionMs;
             double lastMs = phrase.notes[phrase.notes.Length - 1].endMs;
-            Dictionary<int, List<RenderPhone>> phonesByNote =
-                new Dictionary<int, List<RenderPhone>>();
+            Dictionary<int, List<RenderPhone>> phonesByNote =                new Dictionary<int, List<RenderPhone>>();
             foreach (RenderPhone phone in phrase.phones) {
                 if (!phonesByNote.TryGetValue(phone.noteIndex, out List<RenderPhone> group)) {
                     group = new List<RenderPhone>();
@@ -139,8 +137,8 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 group.Add(phone);
             }
-            // Per-note language for cross-lingual singing; continuations inherit.
-            // The native engine requires one language per phrase, so mixed
+            double originMs = ComputeOriginMs(phrase, phonesByNote);
+            // Per-note language for cross-lingual singing; continuations inherit.            // The native engine requires one language per phrase, so mixed
             // languages are split into runs, synthesized separately, then joined.
             List<string> noteLanguages = new List<string>(phrase.notes.Length);
             for (int i = 0; i < phrase.notes.Length; i++) {
@@ -168,7 +166,7 @@ namespace OpenUtau.Core.TsnVoice {
                 runs.Count, string.Join(",", noteLanguages.Distinct()));
             int lastProgress = 0;
             progressReported = 0;
-            double totalMs = Math.Max(1.0, lastMs - firstMs);
+            double totalMs = Math.Max(1.0, lastMs - originMs);
             List<float> allSamples = new List<float>();
             List<TsnVoiceOutputPitch> allPitches = new List<TsnVoiceOutputPitch>();
             for (int runIndex = 0; runIndex < runs.Count; runIndex++) {
@@ -179,12 +177,12 @@ namespace OpenUtau.Core.TsnVoice {
                 double runFirstMs = phrase.notes[run.Item1].positionMs;
                 double runEndMs = phrase.notes[run.Item2 - 1].endMs;
                 List<TsnVoiceInputNote> notes = BuildRunInputs(phrase, phonesByNote,
-                    noteLanguages, run.Item1, run.Item2, runFirstMs);
+                    noteLanguages, run.Item1, run.Item2, originMs);
                 List<TsnVoicePitchPoint> pitch = SamplePitch(
-                    phrase, runFirstMs, runFirstMs, runEndMs);
+                    phrase, originMs, runFirstMs, runEndMs);
                 List<TsnVoiceControlPoint> controls = SampleControls(
-                    phrase, runFirstMs, runFirstMs, runEndMs);
-                double runBase = (runFirstMs - firstMs) / totalMs;
+                    phrase, originMs, runFirstMs, runEndMs);
+                double runBase = (runFirstMs - originMs) / totalMs;
                 double runSpan = Math.Max(0.0, runEndMs - runFirstMs) / totalMs;
                 int capturedIndex = runIndex;
                 int capturedCount = runs.Count;
@@ -203,13 +201,7 @@ namespace OpenUtau.Core.TsnVoice {
                     },
                     null);
                 allSamples.AddRange(output.Samples);
-                double offsetSeconds = (runFirstMs - firstMs) / 1000.0;
-                foreach (TsnVoiceOutputPitch point in output.Pitch) {
-                    TsnVoiceOutputPitch shifted = new TsnVoiceOutputPitch();
-                    shifted.TimeSeconds = point.TimeSeconds + offsetSeconds;
-                    shifted.MidiPitch = point.MidiPitch;
-                    allPitches.Add(shifted);
-                }
+                allPitches.AddRange(output.Pitch);
             }
             progressReported = lastProgress;
             if (allSamples.Count == 0) {
@@ -221,31 +213,56 @@ namespace OpenUtau.Core.TsnVoice {
             merged.StartTime = 0;
             merged.Samples = allSamples.ToArray();
             merged.Pitch = allPitches;
-            SavePitchCache(phrase, pitchPath, merged);
+            SavePitchCache(phrase, pitchPath, merged, originMs);
             float[] samples = TsnVoiceDsp.ResampleLinear(merged.Samples,
                 TsnVoiceParameters.NativeSampleRate, TsnVoiceParameters.MixSampleRate);
             return samples;
         }
 
+        /// <summary>
+        /// 合成原点：首音符首个音素的实际起始（位置减去前置）。
+        /// 输出首采样对准该时刻，与混音槽位（positionMs - leadingMs）一致。
+        /// </summary>
+        static double ComputeOriginMs(RenderPhrase phrase,
+            Dictionary<int, List<RenderPhone>> phonesByNote) {
+            double originMs = phrase.notes[0].positionMs;
+            if (phonesByNote.TryGetValue(0, out List<RenderPhone> group)) {
+                foreach (RenderPhone phone in group) {
+                    double start = phone.positionMs - phone.leadingMs;
+                    if (start < originMs) {
+                        originMs = start;
+                    }
+                }
+            }
+            return originMs;
+        }
+
         List<TsnVoiceInputNote> BuildRunInputs(RenderPhrase phrase,
             Dictionary<int, List<RenderPhone>> phonesByNote, List<string> noteLanguages,
-            int runStart, int runEndExclusive, double runFirstMs) {
+            int runStart, int runEndExclusive, double originMs) {
             List<TsnVoiceInputNote> notes = new List<TsnVoiceInputNote>();
+            int prevTone = phrase.notes[runStart].tone;
             for (int i = runStart; i < runEndExclusive; i++) {
                 RenderNote note = phrase.notes[i];
                 string language = noteLanguages[i];
                 TsnVoiceInputNote input = new TsnVoiceInputNote();
                 input.Id = "n" + i;
-                input.StartSeconds = Math.Max(0, (note.positionMs - runFirstMs) / 1000.0);
+                input.StartSeconds = Math.Max(0, (note.positionMs - originMs) / 1000.0);
                 input.EndSeconds = Math.Max(input.StartSeconds + 0.001,
-                    (note.endMs - runFirstMs) / 1000.0);
+                    (note.endMs - originMs) / 1000.0);
                 input.MidiPitch = note.tone;
                 input.Lyric = string.IsNullOrEmpty(note.lyric)
                     ? TsnVoiceParameters.DefaultLyric(language)
                     : note.lyric;
                 input.Language = language;
                 input.IsContinuation =
-                    input.Lyric == TsnVoiceParameters.ContinuationLyric;
+                    input.Lyric == TsnVoiceParameters.ContinuationLyric && i > runStart;
+                if (input.IsContinuation) {
+                    // 延续音沿用前一实质音符的基音，保持短语内音高上下文连续。
+                    input.MidiPitch = prevTone;
+                } else {
+                    prevTone = note.tone;
+                }
                 string restPhoneme = input.IsContinuation
                     ? null
                     : TsnVoiceParameters.RestPhoneme(input.Lyric);
@@ -276,7 +293,10 @@ namespace OpenUtau.Core.TsnVoice {
                         foreach (RenderPhone phone in group) {
                             TsnVoiceInputPhoneme pinnedPhone = new TsnVoiceInputPhoneme();
                             pinnedPhone.Symbol = phone.phoneme;
-                            pinnedPhone.DurationSeconds = Math.Max(phone.durationMs, 1.0) / 1000.0;
+                            // 固定时长取音素完整跨度（含前置），与起始原点对齐；
+                            // 保持比例，由时长规划缩放到绝对帧位。
+                            pinnedPhone.DurationSeconds = Math.Max(
+                                phone.leadingMs + phone.durationMs, 1.0) / 1000.0;
                             pinnedPhone.StretchWeight = Math.Pow(2.0, 1.0 - phone.velocity / 100.0);
                             input.Phonemes.Add(pinnedPhone);
                         }
@@ -383,15 +403,14 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         static void SavePitchCache(RenderPhrase phrase, string pitchPath,
-            TsnVoiceSynthesisOutput output) {
+            TsnVoiceSynthesisOutput output, double originMs) {
             try {
                 using (FileStream stream = new FileStream(pitchPath, FileMode.Create,
                     FileAccess.Write)) {
                     using (BinaryWriter writer = new BinaryWriter(stream)) {
                         writer.Write(output.Pitch.Count);
                         foreach (TsnVoiceOutputPitch point in output.Pitch) {
-                            double ms = phrase.notes[0].positionMs
-                                + point.TimeSeconds * 1000.0;
+                            double ms = originMs + point.TimeSeconds * 1000.0;
                             float tick = phrase.timeAxis.MsPosToTickPos(ms)
                                 - phrase.position;
                             writer.Write(tick);

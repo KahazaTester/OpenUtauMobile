@@ -275,6 +275,21 @@ namespace OpenUtau.Core.TsnVoice {
 
         const int FftLength = 256;
 
+        // 固定 256 点网格的余弦表：与逐个调用 Math.Cos(2πfs/256)
+        // 按位一致，仅消除重复计算，不改变任何数值。
+        static readonly double[,] CosTable = BuildCosTable();
+
+        static double[,] BuildCosTable() {
+            double[,] table = new double[FftLength / 2 + 1, FftLength];
+            for (int frequency = 0; frequency <= FftLength / 2; frequency++) {
+                for (int sample = 0; sample < FftLength; sample++) {
+                    table[frequency, sample] = Math.Cos(2.0 * Math.PI
+                        * frequency * sample / FftLength);
+                }
+            }
+            return table;
+        }
+
         static void BapFilterCepstra(double[] bap,
             out double[] noise, out double[] pulse) {
             double[] padded = new double[FftLength];
@@ -283,8 +298,7 @@ namespace OpenUtau.Core.TsnVoice {
             for (int frequency = 0; frequency < spectrum.Length; frequency++) {
                 double real = 0;
                 for (int sample = 0; sample < FftLength; sample++) {
-                    double angle = 2.0 * Math.PI * frequency * sample / FftLength;
-                    real += padded[sample] * Math.Cos(angle);
+                    real += padded[sample] * CosTable[frequency, sample];
                 }
                 spectrum[frequency] = real;
             }
@@ -306,8 +320,7 @@ namespace OpenUtau.Core.TsnVoice {
                 double value = values[0] + values[values.Length - 1]
                     * (sample % 2 == 0 ? 1.0 : -1.0);
                 for (int frequency = 1; frequency < FftLength / 2; frequency++) {
-                    double angle = 2.0 * Math.PI * frequency * sample / FftLength;
-                    value += 2.0 * values[frequency] * Math.Cos(angle);
+                    value += 2.0 * values[frequency] * CosTable[frequency, sample];
                 }
                 result[sample] = value / FftLength;
             }
