@@ -47,7 +47,8 @@ namespace OpenUtau.Core.TsnVoice {
                 Encoding.UTF8.GetString(graphemes), "普通话字形表");
             result.graphemeEntries.AddRange(result.graphemeToPinyin);
             result.graphemeEntries.Sort(
-                (left, right) => right.Key.Length.CompareTo(left.Key.Length));
+                (left, right) => TsnVoiceDictionaries.Utf8ByteLength(
+                    right.Key).CompareTo(TsnVoiceDictionaries.Utf8ByteLength(left.Key)));
             result.pinyinToPhonemes = ReadPhonemeTable(
                 Encoding.UTF8.GetString(phonemes));
             if (!config.TryGetValue("VOWELS", out string vowelsValue)) {

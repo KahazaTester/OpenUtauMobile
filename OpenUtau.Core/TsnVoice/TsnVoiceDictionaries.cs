@@ -185,6 +185,14 @@ namespace OpenUtau.Core.TsnVoice {
                 && value.Length <= text.Length - position
                 && text.Substring(position, value.Length).Equals(value, StringComparison.Ordinal);
         }
+
+        /// <summary>
+        /// UTF-8 字节长度，用于最长匹配排序，对照原生 string::size()。
+        /// 假名（3 字节/字）与罗马音（1 字节/字）混排时字符数排序会颠倒优先级。
+        /// </summary>
+        public static int Utf8ByteLength(string value) {
+            return Encoding.UTF8.GetByteCount(value);
+        }
     }
 
     /// <summary>
@@ -217,7 +225,8 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 result.entries.Add(entry);
             }
-            result.entries.Sort((left, right) => right.Key.Length.CompareTo(left.Key.Length));
+            result.entries.Sort((left, right) => TsnVoiceDictionaries.Utf8ByteLength(
+                right.Key).CompareTo(TsnVoiceDictionaries.Utf8ByteLength(left.Key)));
             Dictionary<string, string> config = new Dictionary<string, string>(
                 StringComparer.Ordinal);
             foreach (string rawLine in TsnVoiceDictionaries.GetDictionaryText(

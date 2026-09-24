@@ -138,15 +138,27 @@ namespace OpenUtau.Core.TsnVoice {
                 group.Add(phone);
             }
             double originMs = ComputeOriginMs(phrase, phonesByNote);
-            // Per-note language for cross-lingual singing; continuations inherit.            // The native engine requires one language per phrase, so mixed
+            // Per-note language for cross-lingual singing; continuations inherit.
+            // 参考实现语言是逐音符属性（缺省主语言），此处以文字信号为首选、
+            // 逐语言实际转写验证为准：罗马音等拉丁歌词在主语言转写失败时
+            // 自动落到其它支持语言（如日语），全失败则回退主语言走逐音符记错。
+            // The native engine requires one language per phrase, so mixed
             // languages are split into runs, synthesized separately, then joined.
+            List<string> recordLanguages = new List<string>();
+            foreach (string item in singer.Record.Languages.Split(
+                new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)) {
+                string trimmed = item.Trim();
+                if (trimmed.Length > 0 && !recordLanguages.Contains(trimmed)) {
+                    recordLanguages.Add(trimmed);
+                }
+            }
             List<string> noteLanguages = new List<string>(phrase.notes.Length);
             for (int i = 0; i < phrase.notes.Length; i++) {
                 string lyric = phrase.notes[i].lyric ?? string.Empty;
                 if (lyric == TsnVoiceParameters.ContinuationLyric && i > 0) {
                     noteLanguages.Add(noteLanguages[i - 1]);
                 } else {
-                    noteLanguages.Add(TsnVoiceParameters.DetectNoteLanguage(
+                    noteLanguages.Add(ResolveNoteLanguage(recordLanguages,
                         supportedLanguages, primaryLanguage, lyric));
                 }
             }
@@ -323,6 +335,12 @@ namespace OpenUtau.Core.TsnVoice {
                             if (PhonemeListsEqual(fresh.Phonemes, group)) {
                                 useFrontend = true;
                                 pinned = false;
+                            } else if (group.Count == 1
+                                && group[0].phoneme == input.Lyric) {
+                                // 单音素原文回传是他语言音素器失败的残留，并非用户注音；
+                                // 本语言转写已成功，同样走前端非固定路径。
+                                useFrontend = true;
+                                pinned = false;
                             }
                         } catch (TsnVoiceException e) when (
                             e.Status == TsnVoiceStatus.InvalidArgument
@@ -366,6 +384,31 @@ namespace OpenUtau.Core.TsnVoice {
             }
             return notes;
         }
+        static string ResolveNoteLanguage(List<string> recordLanguages,
+            HashSet<string> supportedLanguages, string primaryLanguage, string lyric) {
+            string hint = TsnVoiceParameters.DetectNoteLanguage(
+                supportedLanguages, primaryLanguage, lyric);
+            List<string> candidates = new List<string>();
+            candidates.Add(hint);
+            candidates.Add(primaryLanguage);
+            candidates.AddRange(recordLanguages);
+            HashSet<string> tried = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string language in candidates) {
+                if (!supportedLanguages.Contains(language) || !tried.Add(language)) {
+                    continue;
+                }
+                try {
+                    TsnVoiceFrontend.Pronounce(language, lyric);
+                    return language;
+                } catch (TsnVoiceException e) when (
+                    e.Status == TsnVoiceStatus.InvalidArgument
+                    || e.Status == TsnVoiceStatus.Unsupported) {
+                    continue;
+                }
+            }
+            return primaryLanguage;
+        }
+
         static bool PhonemeListsEqual(List<string> fresh, List<RenderPhone> group) {
             if (fresh.Count != group.Count) {
                 return false;
