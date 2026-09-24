@@ -70,7 +70,19 @@ namespace OpenUtau.Core.TsnVoice {
             Note? prevNeighbour, Note? nextNeighbour, Note[] prevs) {
             Note note = notes[0];
             List<Phoneme> phonemes = new List<Phoneme>();
-            if (!string.IsNullOrEmpty(note.phoneticHint)) {
+            if (note.lyric == "R" || note.lyric == "r") {
+                // 休止符：静音音素，占据此时值。
+                phonemes.Add(new Phoneme {
+                    phoneme = "sil",
+                    position = 0,
+                });
+            } else if (string.Equals(note.lyric, "br", StringComparison.OrdinalIgnoreCase)) {
+                // 换气：暂停音素。
+                phonemes.Add(new Phoneme {
+                    phoneme = "pau",
+                    position = 0,
+                });
+            } else if (!string.IsNullOrEmpty(note.phoneticHint)) {
                 // 方括号注音：空格分隔的指定音素序列。
                 string[] symbols = note.phoneticHint.Split(
                     new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);

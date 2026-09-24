@@ -69,6 +69,19 @@ namespace OpenUtau.Core.TsnVoice {
             }
         }
 
+        /// <summary>
+        /// 休止与换气歌词对应的静音音素；非此类歌词返回空。
+        /// </summary>
+        public static string RestPhoneme(string lyric) {
+            if (lyric == "R" || lyric == "r") {
+                return "sil";
+            }
+            if (string.Equals(lyric, "br", StringComparison.OrdinalIgnoreCase)) {
+                return "pau";
+            }
+            return null;
+        }
+
         /// <summary>是否为歌手支持的语言。</summary>
         public static bool IsSupportedLanguage(string language) {
             if (string.IsNullOrEmpty(language)) {

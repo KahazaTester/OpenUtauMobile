@@ -369,6 +369,19 @@ namespace OpenUtau.Core.TsnVoice {
             return result.ToArray();
         }
 
+        /// <summary>
+        /// 风格码宽松读取：缺失维度键或维度为零时返回空（该语音不用此条件），
+        /// 组装后的 CNN 输入维度校验仍会拦截真正不兼容的语音。
+        /// </summary>
+        static float[] ConfigCodeOrEmpty(Dictionary<string, string> config,
+            string dimensionsKey, string codeKey) {
+            if (!config.TryGetValue(dimensionsKey, out string dimensionsText)
+                || dimensionsText.Length == 0) {
+                return Array.Empty<float>();
+            }
+            return ConfigCode(config, dimensionsKey, codeKey);
+        }
+
         // 张量分段运行，对应 run_fixed_segments / run_overlapped_segments。
         static float[,] RunFixedSegments(SessionEntry model, float[,] input,
             Action<double> fraction = null) {

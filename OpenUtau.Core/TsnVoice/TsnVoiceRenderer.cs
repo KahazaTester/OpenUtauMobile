@@ -246,7 +246,18 @@ namespace OpenUtau.Core.TsnVoice {
                 input.Language = language;
                 input.IsContinuation =
                     input.Lyric == TsnVoiceParameters.ContinuationLyric;
-                if (!input.IsContinuation
+                string restPhoneme = input.IsContinuation
+                    ? null
+                    : TsnVoiceParameters.RestPhoneme(input.Lyric);
+                if (restPhoneme != null) {
+                    // 休止与换气不跑 G2P，直接以静音占据此时值。
+                    TsnVoiceInputPhoneme rest = new TsnVoiceInputPhoneme();
+                    rest.Symbol = restPhoneme;
+                    rest.DurationSeconds = Math.Max(
+                        input.EndSeconds - input.StartSeconds, 0.001);
+                    rest.StretchWeight = 1.0;
+                    input.Phonemes.Add(rest);
+                } else if (!input.IsContinuation
                     && phonesByNote.TryGetValue(i, out List<RenderPhone> group)) {
                     bool pinned = true;
                     foreach (RenderPhone phone in group) {

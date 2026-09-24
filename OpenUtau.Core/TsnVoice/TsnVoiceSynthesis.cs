@@ -243,8 +243,19 @@ namespace OpenUtau.Core.TsnVoice {
             if (note.Phonemes.Count > 0) {
                 lyric = TsnVoiceFrontend.DefaultLyric(note.Language);
             }
-            TsnVoicePronunciation pronunciation =
-                TsnVoiceFrontend.Pronounce(note.Language, lyric);
+            TsnVoicePronunciation pronunciation;
+            try {
+                pronunciation = TsnVoiceFrontend.Pronounce(note.Language, lyric);
+            } catch (TsnVoiceException e) when (
+                e.Status == TsnVoiceStatus.InvalidArgument
+                || e.Status == TsnVoiceStatus.Unsupported) {
+                // 单个歌词无法转写时不中断整句：该音符以静音占据此时值并记错。
+                // 基础设施错误（词典缺失等）继续上抛。
+                Serilog.Log.Error(e, "TsnVoice 无法转写歌词 {Lyric}（{Language}），该音符静音",
+                    note.Lyric, note.Language);
+                pronunciation = new TsnVoicePronunciation();
+                pronunciation.Phonemes.Add("sil");
+            }
             if (note.Phonemes.Count > 0) {
                 pronunciation.Phonemes.Clear();
                 foreach (TsnVoiceInputPhoneme phoneme in note.Phonemes) {
@@ -934,9 +945,9 @@ namespace OpenUtau.Core.TsnVoice {
                 lf0Context[frame, 0] =
                     (float)TsnVoiceDsp.ScoreLf0(score.Controls[frame].MidiPitch);
             }
-            float[,] emotion = RepeatedCode(frames, ConfigCode(voice.Config,
+            float[,] emotion = RepeatedCode(frames, ConfigCodeOrEmpty(voice.Config,
                 "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE"));
-            float[,] speaker = RepeatedCode(frames, ConfigCode(voice.Config,
+            float[,] speaker = RepeatedCode(frames, ConfigCodeOrEmpty(voice.Config,
                 "SPEAKER_CONTEXT_DIMENSIONS", "SPEAKER_CODE"));
             float[,] stage1Input = ConcatenateColumns(new List<float[,]> {
                 lf0Context, emotion, speaker, frameContext, linguistic,

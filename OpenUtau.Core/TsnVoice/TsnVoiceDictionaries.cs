@@ -282,6 +282,12 @@ namespace OpenUtau.Core.TsnVoice {
             if (lyric.Length == 0) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument, "日语歌词为空");
             }
+            // 罗马音无大小写之分，转小写后再匹配（假名不受影响）。
+            StringBuilder normalized = new StringBuilder(lyric.Length);
+            foreach (char c in lyric) {
+                normalized.Append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+            }
+            lyric = normalized.ToString();
             HashSet<string> vowelSet = new HashSet<string>(vowels, StringComparer.Ordinal);
             List<string> phonemes = new List<string>();
             int position = 0;
