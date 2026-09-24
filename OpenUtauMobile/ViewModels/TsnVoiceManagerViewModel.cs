@@ -111,13 +111,13 @@ public class TsnVoiceVoiceItemViewModel : ReactiveObject
 
     public void RefreshInstalledState()
     {
-        List<string> installed = installer.InstalledVersions(catalog, entry);
+        List<string> installed = installer.InstalledLabels(catalog, entry);
         IsSelectedInstalled = SelectedVersion != null
             && installer.IsInstalled(catalog, entry, SelectedVersion);
         string latest = entry.Versions.FirstOrDefault()?.Version ?? string.Empty;
         HasUpdate = installed.Count > 0
             && !string.IsNullOrEmpty(latest)
-            && !installed.Contains(latest);
+            && !installer.InstalledVersions(catalog, entry).Contains(latest);
         InstalledText = installed.Count == 0
             ? string.Empty
             : string.Format(L.S("TsnVoice.InstalledVersions"), string.Join(", ", installed));

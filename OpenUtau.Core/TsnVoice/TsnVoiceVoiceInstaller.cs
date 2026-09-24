@@ -5,11 +5,25 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 
 namespace OpenUtau.Core.TsnVoice {
+    /// <summary>
+    /// 安装附带元数据：标识具体是哪个变体（label + md5），
+    /// 同一规范版本的不同变体（如 2.0.0 与 2.0.0 Append）共享安装路径，
+    /// 靠附带文件区分实际安装的是哪一个。
+    /// </summary>
+    public class TsnVoiceInstallMetadata {
+        public string VoiceId { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public string Md5 { get; set; } = string.Empty;
+    }
+
     /// <summary>
     /// TsnVoice 语音下载与安装，对应参考实现语音管理器的下载流程：
     /// 校验下载、MD5 校验、按版本目录安装、卸载。
@@ -23,9 +37,59 @@ namespace OpenUtau.Core.TsnVoice {
 
         public string VoiceRoot { get; }
 
+        static string MetadataPath(string packagePath) {
+            return packagePath + ".install.json";
+        }
+
+        static TsnVoiceInstallMetadata ReadMetadata(string packagePath) {
+            string metadataPath = MetadataPath(packagePath);
+            if (!File.Exists(metadataPath)) {
+                return null;
+            }
+            try {
+                using (FileStream stream = new FileStream(metadataPath,
+                    FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                    return JsonSerializer.Deserialize<TsnVoiceInstallMetadata>(stream);
+                }
+            } catch {
+                return null;
+            }
+        }
+
+        void WriteMetadata(TsnVoiceCatalog catalog, TsnVoiceCatalogEntry voice,
+            TsnVoiceCatalogVersion version) {
+            TsnVoiceInstallMetadata metadata = new TsnVoiceInstallMetadata();
+            metadata.VoiceId = voice.Id;
+            metadata.Version = version.Version;
+            metadata.Label = version.Label;
+            metadata.FileName = version.FileName;
+            metadata.Md5 = version.Md5;
+            string metadataPath = MetadataPath(
+                catalog.GetInstallPath(voice, version, VoiceRoot));
+            string temporary = metadataPath + ".tmp";
+            using (FileStream stream = new FileStream(temporary,
+                FileMode.Create, FileAccess.Write, FileShare.None)) {
+                JsonSerializer.Serialize(stream, metadata);
+            }
+            File.Move(temporary, metadataPath, true);
+        }
+
+        /// <summary>
+        /// 是否安装了指定变体：文件存在且附带元数据的 md5 一致；
+        /// 无附带文件的旧安装按文件存在判定（宽松兼容）。
+        /// </summary>
         public bool IsInstalled(TsnVoiceCatalog catalog,
             TsnVoiceCatalogEntry voice, TsnVoiceCatalogVersion version) {
-            return File.Exists(catalog.GetInstallPath(voice, version, VoiceRoot));
+            string packagePath = catalog.GetInstallPath(voice, version, VoiceRoot);
+            if (!File.Exists(packagePath)) {
+                return false;
+            }
+            TsnVoiceInstallMetadata metadata = ReadMetadata(packagePath);
+            if (metadata == null) {
+                return true;
+            }
+            return string.Equals(metadata.Md5, version.Md5,
+                StringComparison.OrdinalIgnoreCase);
         }
 
         public List<string> InstalledVersions(TsnVoiceCatalog catalog,
@@ -35,6 +99,21 @@ namespace OpenUtau.Core.TsnVoice {
                 if (IsInstalled(catalog, voice, version)
                     && !result.Contains(version.Version)) {
                     result.Add(version.Version);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 已安装变体的展示名（label），按目录顺序去重。
+        /// </summary>
+        public List<string> InstalledLabels(TsnVoiceCatalog catalog,
+            TsnVoiceCatalogEntry voice) {
+            List<string> result = new List<string>();
+            foreach (TsnVoiceCatalogVersion version in voice.Versions) {
+                if (IsInstalled(catalog, voice, version)
+                    && !result.Contains(version.Label)) {
+                    result.Add(version.Label);
                 }
             }
             return result;
@@ -117,6 +196,7 @@ namespace OpenUtau.Core.TsnVoice {
                         "下载校验失败：期望 " + version.Md5 + "，实际 " + actualMd5);
                 }
                 File.Move(temporary, destination, true);
+                WriteMetadata(catalog, voice, version);
                 progress?.Report(1.0);
                 Log.Information("TsnVoice 下载完成：{Voice} {Version} {Bytes} 字节",
                     voice.Id, version.Label, downloaded);
@@ -141,6 +221,7 @@ namespace OpenUtau.Core.TsnVoice {
             string packagePath = catalog.GetInstallPath(voice, version, VoiceRoot);
             try {
                 File.Delete(packagePath);
+                File.Delete(MetadataPath(packagePath));
             } catch (Exception e) {
                 throw new TsnVoiceException(TsnVoiceStatus.IoError,
                     "卸载失败：" + e.Message, e);
