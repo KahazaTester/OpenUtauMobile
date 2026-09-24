@@ -243,6 +243,7 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 File.Move(temporary, destination, true);
                 WriteMetadata(catalog, voice, version);
+                await TryDownloadPortraitAsync(catalog, voice);
                 progress?.Report(1.0);
                 Log.Information("TsnVoice 下载完成：{Voice} {Version} {Bytes} 字节",
                     voice.Id, version.Label, downloaded);
@@ -285,6 +286,69 @@ namespace OpenUtau.Core.TsnVoice {
             } catch {
             }
             DocManager.Inst.ExecuteCmd(new SingersChangedNotification());
+        }
+
+        /// <summary>
+        /// 语音立绘保存位置：{voiceRoot}/{voiceId}/portrait.{png,jpg,jpeg}。
+        /// </summary>
+        public static string PortraitPath(string voiceRoot, string voiceId) {
+            string directory = Path.Combine(voiceRoot, voiceId);
+            foreach (string name in new string[] {
+                "portrait.png", "portrait.jpg", "portrait.jpeg",
+            }) {
+                string candidate = Path.Combine(directory, name);
+                if (File.Exists(candidate)) {
+                    return candidate;
+                }
+            }
+            return Path.Combine(directory, "portrait.png");
+        }
+
+        /// <summary>
+        /// 尽力下载立绘：失败仅记录，不影响语音安装。
+        /// </summary>
+        async Task TryDownloadPortraitAsync(TsnVoiceCatalog catalog,
+            TsnVoiceCatalogEntry voice) {
+            if (string.IsNullOrEmpty(voice.ImageUrl)) {
+                return;
+            }
+            Uri imageUri;
+            try {
+                imageUri = new Uri(voice.ImageUrl, UriKind.Absolute);
+                if (imageUri.Scheme != Uri.UriSchemeHttp
+                    && imageUri.Scheme != Uri.UriSchemeHttps) {
+                    return;
+                }
+            } catch {
+                return;
+            }
+            string destination = PortraitPath(VoiceRoot, voice.Id);
+            if (File.Exists(destination)) {
+                return;
+            }
+            try {
+                Directory.CreateDirectory(Path.GetDirectoryName(destination));
+                using (HttpClient client = CreateHttpClient()) {
+                    using (HttpResponseMessage response = await client.GetAsync(
+                        imageUri).ConfigureAwait(false)) {
+                        response.EnsureSuccessStatusCode();
+                        using (Stream source = await response.Content
+                            .ReadAsStreamAsync().ConfigureAwait(false)) {
+                            using (FileStream target = new FileStream(destination,
+                                FileMode.Create, FileAccess.Write, FileShare.None)) {
+                                await source.CopyToAsync(target).ConfigureAwait(false);
+                            }
+                        }
+                    }
+                }
+                Log.Information("TsnVoice 立绘已保存：{Voice}", voice.Id);
+            } catch (Exception e) {
+                Log.Warning(e, "TsnVoice 立绘下载失败：{Voice}", voice.Id);
+                try {
+                    File.Delete(destination);
+                } catch {
+                }
+            }
         }
 
         static HttpClient CreateHttpClient() {

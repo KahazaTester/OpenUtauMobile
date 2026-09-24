@@ -153,12 +153,14 @@ foreach ($license in $db.user_info.licenses) {
         $sorted = @($versions | Sort-Object `
             @{ Expression = { [Version]$_.version }; Descending = $true }, `
             @{ Expression = { [string]$_.label } })
+        $imageUrl = [string]$voice.image
         $catalogVoices.Add([ordered]@{
             id = $voiceId
             name = $displayName.Trim()
             language = $language
             portrait = Find-Portrait $voiceId
             background = Find-Background $voiceId
+            imageUrl = $imageUrl
             versions = @($sorted)
         })
     }

@@ -13,6 +13,7 @@ namespace OpenUtau.Core.TsnVoice {
         public string Language = string.Empty;
         public string Portrait = string.Empty;
         public string Background = string.Empty;
+        public string ImageUrl = string.Empty;
         public List<TsnVoiceCatalogVersion> Versions = new List<TsnVoiceCatalogVersion>();
     }
 
@@ -162,6 +163,7 @@ namespace OpenUtau.Core.TsnVoice {
                         entry.Language = GetString(voice, "language");
                         entry.Portrait = GetString(voice, "portrait");
                         entry.Background = GetString(voice, "background");
+                        entry.ImageUrl = GetString(voice, "imageUrl");
                         if (entry.Id.Length == 0 || entry.Name.Length == 0) {
                             continue;
                         }

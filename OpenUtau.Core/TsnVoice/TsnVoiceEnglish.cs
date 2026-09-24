@@ -291,11 +291,15 @@ namespace OpenUtau.Core.TsnVoice {
                         generic.Add(index);
                     }
                 }
-                if (generic.Count != 1) {
-                    throw new TsnVoiceException(TsnVoiceStatus.Unsupported,
-                        "英语词 '" + word + "' 存在语境相关读音，孤立音符无法选用");
+                if (generic.Count == 1) {
+                    selected = generic[0];
+                } else {
+                    // 无通用读音（或全部带词性标注）时回退首个候选并记录，
+                    // 保证渲染能出声；音素器侧已对该音符标错。
+                    selected = candidateBegin;
+                    Serilog.Log.Warning(
+                        "英语词 '{Word}' 存在语境相关读音，选用首个候选", word);
                 }
-                selected = generic[0];
             }
             string encoded = pronunciations[(int)wordTable.Left[selected]];
             List<string> syllables = SplitNonEmpty(encoded, '|', "英语发音");

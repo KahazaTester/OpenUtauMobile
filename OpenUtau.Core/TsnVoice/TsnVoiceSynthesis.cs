@@ -135,14 +135,12 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         static void ValidateInput(TsnVoicePackage voice, List<TsnVoiceInputNote> notes,
-            List<TsnVoicePitchPoint> pitchPoints, List<TsnVoiceControlPoint> controlPoints,
-            string dictionaryRoot) {
+            List<TsnVoicePitchPoint> pitchPoints, List<TsnVoiceControlPoint> controlPoints) {
             if (notes.Count == 0) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument, "合成请求没有音符");
             }
-            if (!System.IO.Directory.Exists(dictionaryRoot)) {
-                throw new TsnVoiceException(TsnVoiceStatus.IoError, "歌手词典目录不存在");
-            }
+            // 注意：词典以内嵌资源提供，DataPath 覆盖目录无需存在；
+            // 各语言词典在首次使用时加载，缺失会报明确错误。
             HashSet<string> languages = new HashSet<string>(voice.Languages,
                 StringComparer.Ordinal);
             string phraseLanguage = notes[0].Language;
@@ -1296,8 +1294,7 @@ namespace OpenUtau.Core.TsnVoice {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
                     "合成请求过大");
             }
-            ValidateInput(voice, notes, pitchPoints, controlPoints,
-                TsnVoiceDictionaries.DictionaryRoot);
+            ValidateInput(voice, notes, pitchPoints, controlPoints);
             if (isCancelled()) {
                 throw new TsnVoiceException(TsnVoiceStatus.Cancelled, "合成已取消");
             }

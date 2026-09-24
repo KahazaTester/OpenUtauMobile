@@ -31,10 +31,35 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>
         /// 按目录匹配立绘；失败时保持无头像，不影响合成。
+        /// 优先使用下载时保存的本地立绘，其次使用内嵌目录立绘。
         /// </summary>
         public override void EnsureAvatarLoaded() {
             if (avatarData != null) {
                 return;
+            }
+            try {
+                string voiceDirectory = BasePath;
+                if (!string.IsNullOrEmpty(voiceDirectory)) {
+                    string parent = Path.GetDirectoryName(voiceDirectory);
+                    foreach (string directory in new string[] {
+                        parent, voiceDirectory,
+                    }) {
+                        if (string.IsNullOrEmpty(directory)) {
+                            continue;
+                        }
+                        foreach (string name in new string[] {
+                            "portrait.png", "portrait.jpg", "portrait.jpeg",
+                        }) {
+                            string candidate = Path.Combine(directory, name);
+                            if (File.Exists(candidate)) {
+                                avatarData = File.ReadAllBytes(candidate);
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.Warning(e, "无法加载 TsnVoice 本地立绘 {File}", filePath);
             }
             try {
                 TsnVoiceCatalogEntry entry =

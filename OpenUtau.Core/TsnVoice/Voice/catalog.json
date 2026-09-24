@@ -9,6 +9,7 @@
                        "language":  "en_US",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Kotonoha_Akane_English.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -24,6 +25,7 @@
                        "language":  "en_US",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Kotonoha_Aoi_English.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -39,6 +41,7 @@
                        "language":  "en_US",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/AIVOICE_Speaker_3.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -54,6 +57,7 @@
                        "language":  "en_US",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/AIVOICE_Speaker_4.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -69,6 +73,7 @@
                        "language":  "zh_CN",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Kotonoha_Akane_Chinese.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -84,6 +89,7 @@
                        "language":  "zh_CN",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Kotonoha_Aoi_Chinese.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -99,6 +105,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/konami-pp_ja_JP_m852_tts_l2w.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -114,6 +121,7 @@
                        "language":  "en_US",
                        "portrait":  "Singer/nitech-jp_en_US_f008_svss/Chis-A-English.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/%E7%9F%A5%E5%A3%B0EN_fix_0113_trim_for_GUI.png",
                        "versions":  [
                                         {
                                             "version":  "2.2.0",
@@ -153,6 +161,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/nitech-jp_ja_JP_f008_svss/Chis-A.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Chis-A.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -204,6 +213,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/cHp3WMr4HRbkJWBa.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -225,6 +235,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/s-s-s-llc_ja_JP_f812_svss/I6MefvRcoTyod1yP.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/I6MefvRcoTyod1yP.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -246,6 +257,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/s-s-s-llc_ja_JP_f820_svss/IWJtUQp5wuhZGhaX.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/IWJtUQp5wuhZGhaX.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -267,6 +279,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/s-s-s-llc_ja_JP_f821_svss/FIRkMPDnNzF98Lq7.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/FIRkMPDnNzF98Lq7.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -288,6 +301,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/s-s-s-llc_ja_JP_f843_svss/NbHSfnyZp8gGOHjv.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/NbHSfnyZp8gGOHjv.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -303,6 +317,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/s-s-s-llc_ja_JP_f844_svss/TMsDLtB1W8XfIWb1.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/TMsDLtB1W8XfIWb1.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -318,6 +333,7 @@
                        "language":  "en_US",
                        "portrait":  "Singer/techno-sp_en_US_f808_svss/tw43XPyVj8cCV3Zx.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/tw43XPyVj8cCV3Zx.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -339,6 +355,7 @@
                        "language":  "en_US",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/jtE4C4HVeR4pBqMv.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -360,6 +377,7 @@
                        "language":  "en_US",
                        "portrait":  "Singer/techno-sp_en_US_f845_svss/M7WSnFAudrWrqywR.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/M7WSnFAudrWrqywR.png",
                        "versions":  [
                                         {
                                             "version":  "2.3.0",
@@ -381,6 +399,7 @@
                        "language":  "en_US",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/HkzLTXErgTvwBdx3.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -402,6 +421,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f605_svss/rjWvXNPQXat7CEMZ.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/rjWvXNPQXat7CEMZ.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -423,6 +443,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/wzgPJjdL0FCidiSm.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.1",
@@ -444,6 +465,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/t5CTwwSBzSWmdxkd.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -459,6 +481,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f801_svss/f801.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/f801.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -480,6 +503,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/2R3pqxUehws6DStw.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -501,6 +525,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f802_svss/crQnTbFYNQC9QL8q.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/crQnTbFYNQC9QL8q.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -522,6 +547,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/speaker/8B2jjbr6pgfjKHzU.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -543,6 +569,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f803_svss/hLQvgumB9haBpRif.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/hLQvgumB9haBpRif.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.1",
@@ -564,6 +591,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/cYVy7z4a5ThkvcH6.png",
                        "versions":  [
                                         {
                                             "version":  "1.1.0",
@@ -579,6 +607,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/z4HymUqMcLCiVzDM.png",
                        "versions":  [
                                         {
                                             "version":  "1.1.0",
@@ -600,6 +629,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f808_svss/6UxQ6Jsb6aXrxU8C.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/6UxQ6Jsb6aXrxU8C.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.1",
@@ -621,6 +651,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/KAFU.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.2",
@@ -642,6 +673,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f811_svss/bDpbwWcsCdBuiR5z.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/bDpbwWcsCdBuiR5z.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -663,6 +695,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/xRTwGZ2LqYL6yDsB.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -684,6 +717,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/mZqNGD2NffDhZSsG.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -705,6 +739,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f815_svss/xNjtqqiyH8feYSQm.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/xNjtqqiyH8feYSQm.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -726,6 +761,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/pXQ6Xyp6sJMYhfpy.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -747,6 +783,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Rosa.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -762,6 +799,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/FEE-chan.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -777,6 +815,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/SEKAI.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -798,6 +837,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/iuim8tJ8UcWesXhh.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -819,6 +859,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f824_svss/f824.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/f824.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -840,6 +881,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/RIME.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -861,6 +903,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/COKO.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -882,6 +925,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/HARU.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.2",
@@ -903,6 +947,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/POPY.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -918,6 +963,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/ROSE.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.0",
@@ -933,6 +979,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f830_svss/bxyuHr4dY5iSasfS.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/bxyuHr4dY5iSasfS.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -960,6 +1007,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/hGdY7TZMt8zbduhY.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -975,6 +1023,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/z7eQ8r8HucWPDiAT.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -996,6 +1045,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f831_svss/zibWfDxLZ3DbD2vq.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/zibWfDxLZ3DbD2vq.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1017,6 +1067,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f833_svss/snAW3rNZpH3e4yeQ.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/snAW3rNZpH3e4yeQ.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1038,6 +1089,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f834_svss/f834.jpg",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/f834.jpg",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1059,6 +1111,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Hakoniwa_Hano.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.1",
@@ -1074,6 +1127,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Hakoniwa_Koto.png",
                        "versions":  [
                                         {
                                             "version":  "1.0.1",
@@ -1089,6 +1143,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f841_svss/nT2EaXQTLKJ9gGNY.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/nT2EaXQTLKJ9gGNY.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1104,6 +1159,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/UBagQzTwH4zTjbMX.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1119,6 +1175,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/UNI-chan.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1134,6 +1191,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f846_svss/jjknyuK9dAYXnX5G.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/jjknyuK9dAYXnX5G.png",
                        "versions":  [
                                         {
                                             "version":  "2.2.0",
@@ -1155,6 +1213,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f847_svss/z6a7ZNXkgmTNcR3S.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/z6a7ZNXkgmTNcR3S.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1176,6 +1235,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f849_svss/JHEFpEdhgEna2kkf.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/JHEFpEdhgEna2kkf.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1203,6 +1263,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/JHEFpEdhgEna2kkf.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.4",
@@ -1224,6 +1285,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f850_svss/zRHiTadbwA4BF3L5.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/zRHiTadbwA4BF3L5.png",
                        "versions":  [
                                         {
                                             "version":  "2.2.0",
@@ -1245,6 +1307,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f854_svss/ugxKa3tAZFAdTdLt.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/ugxKa3tAZFAdTdLt.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1266,6 +1329,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/hrSVpMuaUhy5tMDS.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1281,6 +1345,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f857_svss/ru8a9KLMpeWF6esw.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/ru8a9KLMpeWF6esw.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1302,6 +1367,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f859_svss/CsKixuw5KMy3Fw3D.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/CsKixuw5KMy3Fw3D.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1323,6 +1389,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f868_svss/dBkzB1vT9HQWgKhz.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/dBkzB1vT9HQWgKhz.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1344,6 +1411,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/9u9RgwaQHsTTQ69P.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1359,6 +1427,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f972_svss/6pmXMwbh88QHQuJZ.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/6pmXMwbh88QHQuJZ.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1380,6 +1449,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f973_svss/xV44FvXAZDNUVzVx.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/xV44FvXAZDNUVzVx.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1401,6 +1471,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f974_svss/pLWK4rFQSkLMMJ7z.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/pLWK4rFQSkLMMJ7z.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1422,6 +1493,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_f975_svss/hrYWjryz6gKfravT.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/hrYWjryz6gKfravT.png",
                        "versions":  [
                                         {
                                             "version":  "2.3.0",
@@ -1449,6 +1521,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/kNDRFpnMYNL9pxtB.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.1",
@@ -1470,6 +1543,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_m804_svss/jE2uEHKxj3AjwBb9.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/jE2uEHKxj3AjwBb9.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1485,6 +1559,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/HkzLTXErgTvwBdx3.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.1",
@@ -1500,6 +1575,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_m805_svss/qFJ2GSHjMF23garT.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/qFJ2GSHjMF23garT.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1515,6 +1591,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_m867_svss/PvSGwz67Vt2RHtFu.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/PvSGwz67Vt2RHtFu.png",
                        "versions":  [
                                         {
                                             "version":  "2.2.0",
@@ -1554,6 +1631,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_m868_svss/m868.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/m868.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1575,6 +1653,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Multi-Speaker.png",
                        "versions":  [
                                         {
                                             "version":  "0.0.0",
@@ -1794,6 +1873,7 @@
                        "language":  "ja_JP",
                        "portrait":  "Singer/techno-sp_ja_JP_t014_svss/BeWk5W3pFPB3ELqr.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/BeWk5W3pFPB3ELqr.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1815,6 +1895,7 @@
                        "language":  "ja_JP",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/BeWk5W3pFPB3ELqr.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1836,6 +1917,7 @@
                        "language":  "zh_CN",
                        "portrait":  "Singer/techno-sp_zh_CN_f853_svss/FUWCQ3NMCnSmXpjx.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/FUWCQ3NMCnSmXpjx.png",
                        "versions":  [
                                         {
                                             "version":  "2.0.0",
@@ -1851,6 +1933,7 @@
                        "language":  "zh_CN",
                        "portrait":  "Singer/techno-sp_zh_CN_m808_svss/Kx7NpdQKU7TW6XGs.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Kx7NpdQKU7TW6XGs.png",
                        "versions":  [
                                         {
                                             "version":  "2.1.0",
@@ -1884,6 +1967,7 @@
                        "language":  "zh_TW",
                        "portrait":  "Singer/techno-sp_zh_TW_f702_svss/N58nNxhSmfJP9nr7.png",
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/N58nNxhSmfJP9nr7.png",
                        "versions":  [
                                         {
                                             "version":  "2.2.0",
@@ -1905,6 +1989,7 @@
                        "language":  "zh_TW",
                        "portrait":  null,
                        "background":  null,
+                       "imageUrl":  "https://mozart-s3.s3.amazonaws.com/media/images/voice/Multi-Speaker.png",
                        "versions":  [
                                         {
                                             "version":  "0.0.0",

@@ -105,6 +105,9 @@ namespace OpenUtau.Core.TsnVoice {
             }
             TsnVoicePackage package = singer.OpenPackage();
             string language = singer.PrimaryLanguage();
+            Log.Information(
+                "TsnVoice 渲染：{Voice} {Language} {Notes} 音符 {Phones} 音素",
+                singer.Record.Id, language, phrase.notes.Length, phrase.phones.Length);
             double firstMs = phrase.notes[0].positionMs;
             List<TsnVoiceInputNote> notes = new List<TsnVoiceInputNote>();
             Dictionary<int, List<RenderPhone>> phonesByNote =

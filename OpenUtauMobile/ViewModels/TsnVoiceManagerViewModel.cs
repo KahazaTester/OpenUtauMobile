@@ -1,11 +1,15 @@
 using OpenUtauMobile.Services.Dialogs;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using DynamicData.Binding;
 using OpenUtau.Core.TsnVoice;
 using OpenUtauMobile.Helpers;
@@ -48,6 +52,13 @@ public class TsnVoiceManagerViewModel : ReactiveObject
                     .ToList();
             });
             Voices.Load(items);
+            await Task.Run(() =>
+            {
+                foreach (TsnVoiceVoiceItemViewModel item in items)
+                {
+                    item.LoadPortrait();
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -84,6 +95,12 @@ public class TsnVoiceVoiceItemViewModel : ReactiveObject
     [Reactive] public bool IsBusy { get; set; }
     [Reactive] public int Progress { get; set; }
 
+    [Reactive] public Bitmap? AvatarBitmap { get; set; }
+    public bool HasAvatar => AvatarBitmap != null;
+
+    static readonly HttpClient portraitHttp = CreatePortraitHttp();
+    static readonly ConcurrentDictionary<string, byte[]> portraitCache = new();
+
     public ReactiveCommand<Unit, Unit> DownloadCommand { get; }
     public ReactiveCommand<Unit, Unit> RemoveCommand { get; }
 
@@ -109,7 +126,65 @@ public class TsnVoiceVoiceItemViewModel : ReactiveObject
 
         this.WhenAnyValue(x => x.SelectedVersion)
             .Subscribe(_ => RefreshInstalledState());
+        this.WhenAnyValue(x => x.AvatarBitmap)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(HasAvatar)));
         RefreshInstalledState();
+    }
+
+    static HttpClient CreatePortraitHttp() {
+        HttpClient client = new HttpClient();
+        client.Timeout = TimeSpan.FromSeconds(15);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("OpenUtauMobile-TsnVoice/1.0");
+        return client;
+    }
+
+    /// <summary>
+    /// 加载卡片立绘：已下载的本地文件 → 内嵌目录立绘 → 远端地址（内存缓存）。
+    /// 后台线程调用，失败保持占位图标。
+    /// </summary>
+    public void LoadPortrait() {
+        if (AvatarBitmap != null) {
+            return;
+        }
+        try {
+            string local = TsnVoiceVoiceInstaller.PortraitPath(
+                installer.VoiceRoot, entry.Id);
+            if (File.Exists(local)) {
+                SetBitmap(File.ReadAllBytes(local));
+                if (AvatarBitmap != null) {
+                    return;
+                }
+            }
+            byte[] embedded = catalog.GetPortraitBytes(entry);
+            if (embedded is { Length: > 0 }) {
+                SetBitmap(embedded);
+                if (AvatarBitmap != null) {
+                    return;
+                }
+            }
+            if (!string.IsNullOrEmpty(entry.ImageUrl)
+                && portraitCache.TryGetValue(entry.Id, out byte[] cached)) {
+                SetBitmap(cached);
+                return;
+            }
+            if (!string.IsNullOrEmpty(entry.ImageUrl)) {
+                byte[] remote = portraitHttp.GetByteArrayAsync(entry.ImageUrl)
+                    .GetAwaiter().GetResult();
+                if (remote is { Length: > 0 }) {
+                    portraitCache[entry.Id] = remote;
+                    SetBitmap(remote);
+                }
+            }
+        } catch {
+        }
+    }
+
+    void SetBitmap(byte[] data) {
+        try {
+            using MemoryStream stream = new(data);
+            AvatarBitmap = new Bitmap(stream);
+        } catch {
+        }
     }
 
     public void RefreshInstalledState()

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -486,12 +486,18 @@
                                                         <Border Grid.Column="0"
                                                                 Width="48" Height="48"
                                                                 CornerRadius="{x:Static foundation:ShapeTokens.CornerL}"
-                                                                Background="{DynamicResource Sem.Color.PrimaryContainer}">
+                                                                Background="{DynamicResource Sem.Color.PrimaryContainer}"
+                                                                ClipToBounds="True">
+                                                            <Grid>
                                                             <iconPacks:PackIconPhosphorIcons Width="{x:Static semantic:IconTokens.Standard}" Height="{x:Static semantic:IconTokens.Standard}"
                                                                     HorizontalAlignment="Center"
                                                                     VerticalAlignment="Center"
                                                                     Foreground="{DynamicResource Sem.Color.Primary}"
                                                                     Kind="Microphone" />
+                                                            <Image Source="{Binding AvatarBitmap}"
+                                                                    IsVisible="{Binding HasAvatar}"
+                                                                    Stretch="UniformToFill" />
+                                                            </Grid>
                                                         </Border>
                                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="{x:Static foundation:LayoutTokens.SpaceXS}">
                                                             <TextBlock Text="{Binding Name}"
