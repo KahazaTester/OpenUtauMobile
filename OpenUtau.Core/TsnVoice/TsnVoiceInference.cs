@@ -239,6 +239,42 @@ namespace OpenUtau.Core.TsnVoice {
             return result;
         }
 
+        static int ConfiguredThreads(TsnVoiceModelSet modelSet) {
+            foreach (string key in new string[] {
+                "NUM_THREADS", "NUMBER_OF_THREADS", "THREADS",
+            }) {
+                if (!modelSet.Config.TryGetValue(key, out string text)) {
+                    continue;
+                }
+                if (!int.TryParse(text,
+                    System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out int value)) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        modelSet.Role + " 线程数无效");
+                }
+                if (value < 0) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        modelSet.Role + " 线程数无效");
+                }
+                return value;
+            }
+            return 0;
+        }
+
+        static bool IsCpuRunner() {
+            try {
+                string runner = Util.Preferences.Default.OnnxRunner;
+                if (string.IsNullOrEmpty(runner)) {
+                    List<string> options = Onnx.getRunnerOptions();
+                    runner = options.Count > 0 ? options[0] : "CPU";
+                }
+                return runner == "CPU";
+            } catch {
+                return false;
+            }
+        }
+
         static void AddSession(Dictionary<string, SessionEntry> sessions,
             TsnVoiceModelSet modelSet) {
             if (modelSet.Models.Count == 0) {
@@ -253,13 +289,28 @@ namespace OpenUtau.Core.TsnVoice {
                     "重复的内嵌模型角色 " + modelSet.Role);
             }
             InferenceSession session;
+            int intraThreads = ConfiguredThreads(modelSet);
             try {
-                // 统一走应用推理后端选择器（CPU 默认；Windows DirectML、
-                // macOS CoreML、Linux CUDA、Android NNAPI 可选，算子级回退 CPU）。
-                // 参考原生固定 CPU 且默认全图优化；语音线程数配置多为空，
-                // 为空时与原生行为一致，故不自建会话以保留加速器选择。
-                session = Onnx.getInferenceSession(
-                    modelSet.Models[0].Data, OnnxRunnerChoice.Default);
+                // 对照原生 ort_runtime：全图优化 + 语音指定的线程数，无加速器。
+                // 仅 CPU 后端自建会话（与原生一致）；加速器选择时沿用应用统一
+                // 后端，任何失败回退统一选择器。仍是托管 1.29 同一引擎，
+                // 不新增原生库；1.18 ConvInteger 补丁在 1.29 无需移植。
+                if (intraThreads > 0 && IsCpuRunner()) {
+                    try {
+                        SessionOptions options = new SessionOptions();
+                        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+                        options.IntraOpNumThreads = intraThreads;
+                        session = new InferenceSession(modelSet.Models[0].Data, options);
+                    } catch (Exception ex) {
+                        Serilog.Log.Warning(ex,
+                            "TsnVoice {Role} 自定义会话失败，回退默认配置", modelSet.Role);
+                        session = Onnx.getInferenceSession(
+                            modelSet.Models[0].Data, OnnxRunnerChoice.Default);
+                    }
+                } else {
+                    session = Onnx.getInferenceSession(
+                        modelSet.Models[0].Data, OnnxRunnerChoice.Default);
+                }
             } catch (Exception e) {
                 throw new TsnVoiceException(TsnVoiceStatus.ModelError,
                     modelSet.Role + " 无法被 ONNX Runtime 加载：" + e.Message, e);

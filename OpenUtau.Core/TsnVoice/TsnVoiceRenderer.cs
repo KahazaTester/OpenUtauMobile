@@ -304,13 +304,19 @@ namespace OpenUtau.Core.TsnVoice {
                             break;
                         }
                     }
-                    if (pinned && !dashPinnedOverride) {
-                        // 音素器失败时会把原文歌词原样作为音素回传；
-                        // ASCII 未知词会通过上面的符号检查，需再用前端校验一次。
-                        // 校验失败则不固定音素，交回推理内 G2P 报错并以静音占据，
+                    bool useFrontend = false;
+                    if (pinned && !dashPinnedOverride && !isDash) {
+                        // 对照原生 prepare_note：仅用户固定才重定时。
+                        // 管道音素与前端转写一致视为未固定，走 HTS 时长模型；
+                        // 方括号改写等才固定时长；转写失败记错并以静音占据，
                         // 整句其余音符照常渲染。
                         try {
-                            TsnVoiceFrontend.Pronounce(language, input.Lyric);
+                            TsnVoicePronunciation fresh =
+                                TsnVoiceFrontend.Pronounce(language, input.Lyric);
+                            if (PhonemeListsEqual(fresh.Phonemes, group)) {
+                                useFrontend = true;
+                                pinned = false;
+                            }
                         } catch (TsnVoiceException e) when (
                             e.Status == TsnVoiceStatus.InvalidArgument
                             || e.Status == TsnVoiceStatus.Unsupported) {
@@ -319,7 +325,9 @@ namespace OpenUtau.Core.TsnVoice {
                             pinned = false;
                         }
                     }
-                    if (!pinned) {
+                    if (useFrontend) {
+                        // 留空交回推理内 G2P：HTS 决定辅音时值，元音推导前置。
+                    } else if (!pinned) {
                         // Symbols with non-ASCII text are usually failed phonemizer
                         // fallbacks holding the raw lyric; let the inference
                         // frontend for this language transcribe them instead.
@@ -351,6 +359,18 @@ namespace OpenUtau.Core.TsnVoice {
             }
             return notes;
         }
+        static bool PhonemeListsEqual(List<string> fresh, List<RenderPhone> group) {
+            if (fresh.Count != group.Count) {
+                return false;
+            }
+            for (int i = 0; i < fresh.Count; i++) {
+                if (!string.Equals(fresh[i], group[i].phoneme, StringComparison.Ordinal)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         static RenderNote OwnerNoteAt(RenderPhrase phrase, double ms) {
             RenderNote owner = phrase.notes[phrase.notes.Length - 1];
             foreach (RenderNote note in phrase.notes) {
