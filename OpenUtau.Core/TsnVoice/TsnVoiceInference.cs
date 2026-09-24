@@ -115,18 +115,29 @@ namespace OpenUtau.Core.TsnVoice {
     /// <summary>
     /// 托管推理管线，对应原生 inference_pipeline.cpp + ort_runtime.cpp。
     /// 会话经应用统一后端选择器创建（默认 CPU，与原生一致），
-    /// 按语音（路径+大小+修改时间）缓存，最多保留 4 个。
+    /// 按语音（路径+大小+修改时间）缓存解析包与会话，最多保留 4 个。
+    /// 模型字节在会话创建后释放，仅保留配置、问题集与 HMM 数据，
+    /// 避免移动端重复解析大语音包与常驻双份模型内存。
     /// </summary>
     public static partial class TsnVoiceInference {
-        class SessionEntry {
+        public class SessionEntry {
             public InferenceSession Session;
             public readonly object RunLock = new object();
         }
 
-        class CachedVoice {
-            public string Key = string.Empty;
+        /// <summary>
+        /// 单个语音的缓存句柄：解析包、会话与渲染锁。
+        /// </summary>
+        public class TsnVoiceVoiceHandle {
+            public TsnVoicePackage Package;
             public Dictionary<string, SessionEntry> Sessions =
                 new Dictionary<string, SessionEntry>(StringComparer.Ordinal);
+            public readonly object SyncRoot = new object();
+        }
+
+        class CachedVoice {
+            public string Key = string.Empty;
+            public TsnVoiceVoiceHandle Handle = new TsnVoiceVoiceHandle();
         }
 
         static readonly object cacheLock = new object();
@@ -137,8 +148,11 @@ namespace OpenUtau.Core.TsnVoice {
             return path + "\n" + info.Length + "\n" + info.LastWriteTimeUtc.Ticks;
         }
 
-        static Dictionary<string, SessionEntry> GetSessions(TsnVoicePackage voice) {
-            string key = CacheKey(voice.SourcePath);
+        /// <summary>
+        /// 获取语音缓存句柄：解析包只解析一次，会话只创建一次。
+        /// </summary>
+        public static TsnVoiceVoiceHandle GetVoiceHandle(string voicePath) {
+            string key = CacheKey(voicePath);
             lock (cacheLock) {
                 LinkedListNode<CachedVoice> hit = null;
                 for (LinkedListNode<CachedVoice> node = cache.First;
@@ -152,16 +166,20 @@ namespace OpenUtau.Core.TsnVoice {
                 if (hit != null) {
                     cache.Remove(hit);
                     cache.AddFirst(hit);
-                    return hit.Value.Sessions;
+                    return hit.Value.Handle;
                 }
-                Dictionary<string, SessionEntry> sessions = LoadSessions(voice);
+                TsnVoiceVoiceHandle handle = new TsnVoiceVoiceHandle();
+                handle.Package = TsnVoicePackage.Load(voicePath);
+                LoadSessions(handle);
+                ReleaseModelBytes(handle.Package);
                 CachedVoice entry = new CachedVoice();
                 entry.Key = key;
-                entry.Sessions = sessions;
+                entry.Handle = handle;
                 cache.AddFirst(entry);
                 while (cache.Count > 4) {
                     LinkedListNode<CachedVoice> last = cache.Last;
-                    foreach (KeyValuePair<string, SessionEntry> session in last.Value.Sessions) {
+                    foreach (KeyValuePair<string, SessionEntry> session in
+                        last.Value.Handle.Sessions) {
                         try {
                             session.Value.Session.Dispose();
                         } catch {
@@ -169,8 +187,38 @@ namespace OpenUtau.Core.TsnVoice {
                     }
                     cache.RemoveLast();
                 }
-                return sessions;
+                return handle;
             }
+        }
+
+        static Dictionary<string, SessionEntry> GetSessions(TsnVoicePackage voice) {
+            return GetVoiceHandle(voice.SourcePath).Sessions;
+        }
+
+        /// <summary>
+        /// 会话创建后释放模型字节：会话持有原生侧拷贝，
+        /// 配置、问题集与 HMM 数据保留供后续渲染使用。
+        /// </summary>
+        static void ReleaseModelBytes(TsnVoicePackage voice) {
+            foreach (TsnVoiceModelSet modelSet in EnumerateModelSets(voice)) {
+                foreach (TsnVoiceModelBlob blob in modelSet.Models) {
+                    blob.Data = Array.Empty<byte>();
+                }
+            }
+        }
+
+        static List<TsnVoiceModelSet> EnumerateModelSets(TsnVoicePackage voice) {
+            List<TsnVoiceModelSet> result = new List<TsnVoiceModelSet>();
+            foreach (TsnVoiceModelSet modelSet in voice.UniqueContextModels.Values) {
+                result.Add(modelSet);
+            }
+            result.Add(voice.CommonContextModel);
+            result.Add(voice.LinguisticModel);
+            result.Add(voice.AcousticStage1Model);
+            result.Add(voice.AcousticStage2Model);
+            result.Add(voice.AuxiliaryModel);
+            result.Add(voice.VocoderModel);
+            return result;
         }
 
         static void AddSession(Dictionary<string, SessionEntry> sessions,
@@ -202,9 +250,9 @@ namespace OpenUtau.Core.TsnVoice {
             sessions[modelSet.Role] = entry;
         }
 
-        static Dictionary<string, SessionEntry> LoadSessions(TsnVoicePackage voice) {
-            Dictionary<string, SessionEntry> sessions =
-                new Dictionary<string, SessionEntry>(StringComparer.Ordinal);
+        static void LoadSessions(TsnVoiceVoiceHandle handle) {
+            TsnVoicePackage voice = handle.Package;
+            Dictionary<string, SessionEntry> sessions = handle.Sessions;
             if (!voice.LegacyContextLayout) {
                 foreach (KeyValuePair<string, TsnVoiceModelSet> pair in voice.UniqueContextModels) {
                     AddSession(sessions, pair.Value);
@@ -215,7 +263,6 @@ namespace OpenUtau.Core.TsnVoice {
             AddSession(sessions, voice.AcousticStage1Model);
             AddSession(sessions, voice.AcousticStage2Model);
             AddSession(sessions, voice.VocoderModel);
-            return sessions;
         }
 
         static SessionEntry GetModel(Dictionary<string, SessionEntry> sessions, string role) {

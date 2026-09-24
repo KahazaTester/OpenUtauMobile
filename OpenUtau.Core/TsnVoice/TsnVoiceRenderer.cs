@@ -16,12 +16,11 @@ using Serilog;
 namespace OpenUtau.Core.TsnVoice {
     /// <summary>
     /// TsnVoice 渲染器：一等引擎，与 Vogen/DiffSinger 并列注册于 Renderers。
-    /// 乐句内的相邻同语言音符连续合成；用户音高曲线按绝对音高约束，
-    /// ALP/HUS 自定义曲线参与声学条件；音素编辑经固定音素传入。
+    /// 乐句内的相邻同语言音符连续合成；未手绘音高的音符使用模型自动 F0，
+    /// 手绘音高的音符按绝对音高约束；ALP/HUS 自定义曲线参与声学条件；
+    /// 音素编辑经固定音素传入。
     /// </summary>
     public class TsnVoiceRenderer : IRenderer {
-        static readonly object lockObj = new object();
-
         public USingerType SingerType => USingerType.TsnVoice;
 
         public bool SupportsRenderPitch => true;
@@ -43,11 +42,10 @@ namespace OpenUtau.Core.TsnVoice {
             int trackNo, CancellationTokenSource cancellation, bool isPreRender = false,
             RenderPhraseEvents? renderEvents = null) {
             Task<RenderResult> task = Task.Run(() => {
-                lock (lockObj) {
-                    RenderResult result = Layout(phrase);
-                    if (cancellation.IsCancellationRequested) {
-                        return result;
-                    }
+                RenderResult result = Layout(phrase);
+                if (cancellation.IsCancellationRequested) {
+                    return result;
+                }
                     string wavPath = Path.Join(PathManager.Inst.CachePath,
                         $"tsn-{phrase.hash:x16}.wav");
                     string pitchPath = Path.Join(PathManager.Inst.CachePath,
@@ -90,7 +88,6 @@ namespace OpenUtau.Core.TsnVoice {
                     }
                     progress.Complete(phrase.phones.Length, progressInfo);
                     return result;
-                }
             });
             return task;
         }
@@ -103,7 +100,20 @@ namespace OpenUtau.Core.TsnVoice {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
                     "TsnVoice 渲染器需要 TsnVoice 歌手");
             }
-            TsnVoicePackage package = singer.OpenPackage();
+            // 解析包与会话按语音缓存，同一语音串行，不同语音并行。
+            TsnVoiceInference.TsnVoiceVoiceHandle handle =
+                TsnVoiceInference.GetVoiceHandle(singer.Location);
+            lock (handle.SyncRoot) {
+                return InvokeTsnVoiceLocked(handle, singer, phrase, progress,
+                    progressInfo, cancellation, pitchPath);
+            }
+        }
+
+        float[] InvokeTsnVoiceLocked(TsnVoiceInference.TsnVoiceVoiceHandle handle,
+            TsnVoiceSinger singer, RenderPhrase phrase, Progress progress,
+            string progressInfo, CancellationTokenSource cancellation,
+            string pitchPath) {
+            TsnVoicePackage package = handle.Package;
             string language = singer.PrimaryLanguage();
             Log.Information(
                 "TsnVoice 渲染：{Voice} {Language} {Notes} 音符 {Phones} 音素",
@@ -173,6 +183,24 @@ namespace OpenUtau.Core.TsnVoice {
             return samples;
         }
 
+        static RenderNote OwnerNoteAt(RenderPhrase phrase, double ms) {
+            RenderNote owner = phrase.notes[phrase.notes.Length - 1];
+            foreach (RenderNote note in phrase.notes) {
+                if (note.positionMs <= ms) {
+                    owner = note;
+                } else {
+                    break;
+                }
+            }
+            // 延续音符归属前一实质音符，与其共享发音与音高模式。
+            int index = Array.IndexOf(phrase.notes, owner);
+            while (index > 0
+                && phrase.notes[index].lyric == TsnVoiceParameters.ContinuationLyric) {
+                index--;
+            }
+            return phrase.notes[index];
+        }
+
         static List<TsnVoicePitchPoint> SamplePitch(RenderPhrase phrase,
             double firstMs) {
             const int pitchInterval = 5;
@@ -183,11 +211,20 @@ namespace OpenUtau.Core.TsnVoice {
                 int ticks = phrase.timeAxis.MsPosToTickPos(ms)
                     - (phrase.position - phrase.leading);
                 int index = Math.Clamp(ticks / pitchInterval, 0, phrase.pitches.Length - 1);
+                RenderNote owner = OwnerNoteAt(phrase, ms);
+                double midi;
+                if (owner.hasManualPitch) {
+                    // 手绘音高：整体按绝对音高约束。
+                    midi = phrase.pitches[index] * 0.01;
+                } else {
+                    // 自动音高：基音 + PITD 偏移，颤音与手绘由模型生成。
+                    midi = owner.tone + (phrase.pitches[index]
+                        - phrase.pitchesBeforeDeviation[index]) * 0.01;
+                }
                 TsnVoicePitchPoint point = new TsnVoicePitchPoint();
                 point.TimeSeconds = Math.Max(0, (ms - firstMs) / 1000.0);
-                point.MidiPitch = Math.Clamp(phrase.pitches[index] * 0.01, 0.0, 127.0);
-                // 编辑器音高曲线恒为权威：按绝对音高约束。
-                point.IsAbsolute = true;
+                point.MidiPitch = Math.Clamp(midi, 0.0, 127.0);
+                point.IsAbsolute = owner.hasManualPitch;
                 result.Add(point);
             }
             return result;

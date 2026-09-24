@@ -23,7 +23,19 @@ namespace OpenUtau.Core.Render {
         public readonly double durationMs;
         public readonly double endMs;
 
+        /// <summary>
+        /// 是否含用户绘制的音高（任一音高点 Y 非零）。
+        /// 新建与重置后的默认平直音高点不计入，仅供 TsnVoice 区分自动 F0 与绝对音高；
+        /// 其他渲染器忽略此字段，行为不变。
+        /// </summary>
+        public readonly bool hasManualPitch;
+
         public RenderNote(Pipeline.NoteSource note, TimeAxis axis, int partPosition, int phrasePosition) {
+            lyric = note.Lyric;
+            tone = note.Tone;
+            tuning = note.Tuning;
+            adjustedTone = note.AdjustedTone;
+            hasManualPitch = note.PitchPoints.Any(p => p.Y != 0);
             lyric = note.Lyric;
             tone = note.Tone;
             tuning = note.Tuning;
