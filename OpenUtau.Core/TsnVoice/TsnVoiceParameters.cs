@@ -97,9 +97,10 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>
         /// 按歌词文字推断音符语言（跨语言演唱用）：
-        /// 谚文→韩语，假名→日语，汉字→中文（优先歌手主语言的中文变体），
-        /// 其余（拉丁文等）沿用歌手主语言（罗马音、拼音按主语言前端处理）。
-        /// 歌手不支持推断出的语言时抛错，不静默套用错误模型。
+        /// 谚文→韩语，假名→日语，汉字→中文或日文（两者共享汉字）。
+        /// 参考实现中语言是逐音符属性（缺省为语音主语言），从不按文字猜测；
+        /// 此处仅在语音支持时采纳文字信号，否则一律回退主语言，
+        /// 绝不抛错中断整句：转写失败走逐音符静音加记错路径。
         /// </summary>
         public static string DetectNoteLanguage(
             HashSet<string> supportedLanguages, string primaryLanguage, string lyric) {
@@ -134,7 +135,10 @@ namespace OpenUtau.Core.TsnVoice {
                 return primaryLanguage;
             }
             if (signal == "zh") {
-                if (primaryLanguage == "zh_CN" || primaryLanguage == "zh_TW") {
+                // 汉字为中日共享：主语言读汉字时优先主语言（如日语 voice 的漢字歌词），
+                // 否则选支持的中文变体，都不支持则回退主语言由 G2P 逐音符报错。
+                if (primaryLanguage == "ja_JP" || primaryLanguage == "zh_CN"
+                    || primaryLanguage == "zh_TW") {
                     return primaryLanguage;
                 }
                 if (supportedLanguages.Contains("zh_CN")) {
@@ -143,11 +147,12 @@ namespace OpenUtau.Core.TsnVoice {
                 if (supportedLanguages.Contains("zh_TW")) {
                     return "zh_TW";
                 }
-            } else if (supportedLanguages.Contains(signal)) {
+                return primaryLanguage;
+            }
+            if (supportedLanguages.Contains(signal)) {
                 return signal;
             }
-            throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
-                "当前语音不支持歌词语言（" + lyric + "），请使用支持该语言的跨语言版本");
+            return primaryLanguage;
         }
 
         /// <summary>
