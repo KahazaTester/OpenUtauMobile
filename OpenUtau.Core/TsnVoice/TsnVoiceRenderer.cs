@@ -255,13 +255,34 @@ namespace OpenUtau.Core.TsnVoice {
                     ? TsnVoiceParameters.DefaultLyric(language)
                     : note.lyric;
                 input.Language = language;
-                input.IsContinuation =
-                    input.Lyric == TsnVoiceParameters.ContinuationLyric && i > runStart;
+                phonesByNote.TryGetValue(i, out List<RenderPhone> group);
+                bool isDash = input.Lyric == TsnVoiceParameters.ContinuationLyric;
+                // 用户在延续符上写方括号注音视为固定音素覆盖，不再按延续处理。
+                bool dashPinnedOverride = isDash && group != null
+                    && !(group.Count == 1 && group[0].phoneme == "-");
+                bool adjacent = i == runStart || phrase.notes[i - 1].endMs + 1.0
+                    >= note.positionMs;
+                input.IsContinuation = isDash && !dashPinnedOverride
+                    && i > runStart && adjacent;
                 if (input.IsContinuation) {
                     // 延续音沿用前一实质音符的基音，保持短语内音高上下文连续。
                     input.MidiPitch = prevTone;
                 } else {
                     prevTone = note.tone;
+                }
+                if (isDash && !input.IsContinuation && !dashPinnedOverride) {
+                    // 句首或断开的延续符无法归属前一发音：记错并以静音占据，
+                    // 整句其余音符照常渲染。
+                    Log.Error("TsnVoice 延续音符 {Id} 缺少前置发音，该音符静音",
+                        input.Id);
+                    TsnVoiceInputPhoneme lone = new TsnVoiceInputPhoneme();
+                    lone.Symbol = "sil";
+                    lone.DurationSeconds = Math.Max(
+                        input.EndSeconds - input.StartSeconds, 0.001);
+                    lone.StretchWeight = 1.0;
+                    input.Phonemes.Add(lone);
+                    notes.Add(input);
+                    continue;
                 }
                 string restPhoneme = input.IsContinuation
                     ? null
@@ -275,12 +296,27 @@ namespace OpenUtau.Core.TsnVoice {
                     rest.StretchWeight = 1.0;
                     input.Phonemes.Add(rest);
                 } else if (!input.IsContinuation
-                    && phonesByNote.TryGetValue(i, out List<RenderPhone> group)) {
+                    && group != null) {
                     bool pinned = true;
                     foreach (RenderPhone phone in group) {
                         if (!TsnVoiceParameters.IsPhonemeSymbol(phone.phoneme)) {
                             pinned = false;
                             break;
+                        }
+                    }
+                    if (pinned && !dashPinnedOverride) {
+                        // 音素器失败时会把原文歌词原样作为音素回传；
+                        // ASCII 未知词会通过上面的符号检查，需再用前端校验一次。
+                        // 校验失败则不固定音素，交回推理内 G2P 报错并以静音占据，
+                        // 整句其余音符照常渲染。
+                        try {
+                            TsnVoiceFrontend.Pronounce(language, input.Lyric);
+                        } catch (TsnVoiceException e) when (
+                            e.Status == TsnVoiceStatus.InvalidArgument
+                            || e.Status == TsnVoiceStatus.Unsupported) {
+                            Log.Error(e, "TsnVoice 音符 {Id} 歌词 {Lyric} 无法转写，该音符静音",
+                                input.Id, input.Lyric);
+                            pinned = false;
                         }
                     }
                     if (!pinned) {
