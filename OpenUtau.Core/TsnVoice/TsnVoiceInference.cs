@@ -45,6 +45,7 @@ namespace OpenUtau.Core.TsnVoice {
     public class TsnVoiceOutputPhoneme {
         public string NoteId = string.Empty;
         public string Symbol = string.Empty;
+        public double StartSeconds;
         public double DurationSeconds;
         public double StretchWeight;
         public double BodyOffsetSeconds;

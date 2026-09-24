@@ -379,6 +379,11 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
         {
             RenderResetTarget(context);
         }
+
+        // TsnVoice 合成实际时值叠加：模型音素边界（主色竖线）、前置辅音区（淡底）、
+        // 主体起点（短刻度），数据来自渲染缓存，不影响包络交互。
+        TsnVoiceTimingOverlay.Draw(context, Part, TickOffset, TickWidth,
+            envelopeTopY, envelopeHeight, viewLeftTick, viewRightTick);
     }
 
     private void RenderResetTarget(DrawingContext context)

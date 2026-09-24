@@ -50,8 +50,11 @@ namespace OpenUtau.Core.TsnVoice {
                         $"tsn-{phrase.hash:x16}.wav");
                     string pitchPath = Path.Join(PathManager.Inst.CachePath,
                         $"tsn-{phrase.hash:x16}.pitch");
+                    string phnPath = Path.Join(PathManager.Inst.CachePath,
+                        $"tsn-{phrase.hash:x16}.phn");
                     phrase.AddCacheFile(wavPath);
                     phrase.AddCacheFile(pitchPath);
+                    phrase.AddCacheFile(phnPath);
                     string progressInfo = $"Track {trackNo + 1}: {this} "
                         + $"\"{string.Join(" ", phrase.phones.Select(p => p.phoneme))}\"";
                     progress.Complete(0, progressInfo);
@@ -69,7 +72,7 @@ namespace OpenUtau.Core.TsnVoice {
                     if (result.samples == null) {
                         try {
                             result.samples = InvokeTsnVoice(phrase, progress,
-                                progressInfo, cancellation, pitchPath,
+                                progressInfo, cancellation, pitchPath, phnPath,
                                 out int reported);
                             progress.Complete(
                                 Math.Max(0, phrase.phones.Length - reported),
@@ -103,7 +106,7 @@ namespace OpenUtau.Core.TsnVoice {
 
         float[] InvokeTsnVoice(RenderPhrase phrase, Progress progress,
             string progressInfo, CancellationTokenSource cancellation,
-            string pitchPath, out int progressReported) {
+            string pitchPath, string phnPath, out int progressReported) {
             TsnVoiceSinger singer = phrase.singer as TsnVoiceSinger;
             if (singer == null) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
@@ -114,14 +117,14 @@ namespace OpenUtau.Core.TsnVoice {
                 TsnVoiceInference.GetVoiceHandle(singer.Location);
             lock (handle.SyncRoot) {
                 return InvokeTsnVoiceLocked(handle, singer, phrase, progress,
-                    progressInfo, cancellation, pitchPath, out progressReported);
+                    progressInfo, cancellation, pitchPath, phnPath, out progressReported);
             }
         }
 
         float[] InvokeTsnVoiceLocked(TsnVoiceInference.TsnVoiceVoiceHandle handle,
             TsnVoiceSinger singer, RenderPhrase phrase, Progress progress,
             string progressInfo, CancellationTokenSource cancellation,
-            string pitchPath, out int progressReported) {
+            string pitchPath, string phnPath, out int progressReported) {
             TsnVoicePackage package = handle.Package;
             string primaryLanguage = singer.PrimaryLanguage();
             HashSet<string> supportedLanguages =
@@ -233,6 +236,7 @@ namespace OpenUtau.Core.TsnVoice {
             merged.Samples = allSamples.ToArray();
             merged.Pitch = allPitches;
             SavePitchCache(phrase, pitchPath, merged, originMs);
+            SavePhonemeCache(phrase, phnPath, merged, originMs);
             float[] samples = TsnVoiceDsp.ResampleLinear(merged.Samples,
                 TsnVoiceParameters.NativeSampleRate, TsnVoiceParameters.MixSampleRate);
             return samples;
@@ -506,6 +510,121 @@ namespace OpenUtau.Core.TsnVoice {
                 result.Add(point);
             }
             return result;
+        }
+
+        /// <summary>
+        /// 合成音素定时（对照原生 PublishBatch 的 SynthesizedSyllable）：
+        /// 供音素面板叠加显示模型实际时值，缓存键与音频/音高一致。
+        /// </summary>
+        public class TsnVoiceRenderedPhone {
+            public int NoteIndex;
+            public string Symbol = string.Empty;
+            public float StartTick;
+            public float EndTick;
+            public bool IsLeading;
+            public float BodyTick;
+        }
+
+        static readonly object phoneCacheLock = new object();
+        static readonly Dictionary<ulong, Tuple<long, List<TsnVoiceRenderedPhone>>> phoneCache =
+            new Dictionary<ulong, Tuple<long, List<TsnVoiceRenderedPhone>>>();
+
+        static void SavePhonemeCache(RenderPhrase phrase, string phnPath,
+            TsnVoiceSynthesisOutput output, double originMs) {
+            try {
+                using (FileStream stream = new FileStream(phnPath, FileMode.Create,
+                    FileAccess.Write)) {
+                    using (BinaryWriter writer = new BinaryWriter(stream)) {
+                        List<TsnVoiceOutputPhoneme> phones = new List<TsnVoiceOutputPhoneme>();
+                        foreach (TsnVoiceOutputPhoneme phone in output.Phonemes) {
+                            if (phone.NoteId.Length > 1 && phone.NoteId[0] == 'n'
+                                && int.TryParse(phone.NoteId.Substring(1),
+                                    out int noteIndex)
+                                && noteIndex >= 0
+                                && noteIndex < phrase.notes.Length) {
+                                phones.Add(phone);
+                            }
+                        }
+                        writer.Write(phones.Count);
+                        foreach (TsnVoiceOutputPhoneme phone in phones) {
+                            int noteIndex = int.Parse(phone.NoteId.Substring(1));
+                            double startMs = originMs + phone.StartSeconds * 1000.0;
+                            double endMs = startMs + phone.DurationSeconds * 1000.0;
+                            double bodyMs = phrase.notes[noteIndex].positionMs
+                                + phone.BodyOffsetSeconds * 1000.0;
+                            writer.Write(noteIndex);
+                            writer.Write(phone.Symbol ?? string.Empty);
+                            writer.Write(startMs);
+                            writer.Write(endMs);
+                            writer.Write(phone.IsLeading);
+                            writer.Write(bodyMs);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.Warning(e, "写入 TsnVoice 音素缓存失败");
+            }
+        }
+
+        /// <summary>
+        /// 读取合成音素定时（乐句相对 Tick），无缓存返回空表。
+        /// </summary>
+        public static List<TsnVoiceRenderedPhone> LoadRenderedPhonemes(RenderPhrase phrase) {
+            string phnPath = Path.Join(PathManager.Inst.CachePath,
+                $"tsn-{phrase.hash:x16}.phn");
+            if (!File.Exists(phnPath)) {
+                return new List<TsnVoiceRenderedPhone>();
+            }
+            try {
+                long mtime = new FileInfo(phnPath).LastWriteTimeUtc.Ticks;
+                lock (phoneCacheLock) {
+                    if (phoneCache.TryGetValue(phrase.hash, out var cached)
+                        && cached.Item1 == mtime) {
+                        return cached.Item2;
+                    }
+                }
+                List<TsnVoiceRenderedPhone> result = new List<TsnVoiceRenderedPhone>();
+                using (FileStream stream = new FileStream(phnPath, FileMode.Open,
+                    FileAccess.Read)) {
+                    using (BinaryReader reader = new BinaryReader(stream)) {
+                        int count = reader.ReadInt32();
+                        if (count < 0 || count > 100000) {
+                            return result;
+                        }
+                        for (int i = 0; i < count; i++) {
+                            TsnVoiceRenderedPhone phone = new TsnVoiceRenderedPhone();
+                            phone.NoteIndex = reader.ReadInt32();
+                            phone.Symbol = reader.ReadString();
+                            double startMs = reader.ReadDouble();
+                            double endMs = reader.ReadDouble();
+                            phone.IsLeading = reader.ReadBoolean();
+                            double bodyMs = reader.ReadDouble();
+                            phone.StartTick = phrase.timeAxis.MsPosToTickPos(startMs)
+                                - phrase.position;
+                            phone.EndTick = phrase.timeAxis.MsPosToTickPos(endMs)
+                                - phrase.position;
+                            phone.BodyTick = phrase.timeAxis.MsPosToTickPos(bodyMs)
+                                - phrase.position;
+                            result.Add(phone);
+                        }
+                    }
+                }
+                lock (phoneCacheLock) {
+                    phoneCache[phrase.hash] = Tuple.Create(mtime, result);
+                    while (phoneCache.Count > 8) {
+                        foreach (ulong key in new List<ulong>(phoneCache.Keys)) {
+                            if (key != phrase.hash) {
+                                phoneCache.Remove(key);
+                                break;
+                            }
+                        }
+                    }
+                }
+                return result;
+            } catch (Exception e) {
+                Log.Warning(e, "读取 TsnVoice 音素缓存失败");
+                return new List<TsnVoiceRenderedPhone>();
+            }
         }
 
         static void SavePitchCache(RenderPhrase phrase, string pitchPath,

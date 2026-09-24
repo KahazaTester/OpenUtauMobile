@@ -1292,6 +1292,8 @@ namespace OpenUtau.Core.TsnVoice {
                 TsnVoiceOutputPhoneme phoneme = new TsnVoiceOutputPhoneme();
                 phoneme.NoteId = score.PhoneNoteIds[phone];
                 phoneme.Symbol = score.LabelPhonemes[phone];
+                phoneme.StartSeconds = notes[0].StartSeconds
+                    + (score.PhoneStarts[phone] - score.ContentStartFrame) * frameSeconds;
                 phoneme.DurationSeconds =
                     (score.PhoneEnds[phone] - score.PhoneStarts[phone]) * frameSeconds;
                 phoneme.StretchWeight = score.PhoneStretchWeights[phone];

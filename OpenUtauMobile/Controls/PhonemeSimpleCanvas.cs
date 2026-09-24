@@ -272,6 +272,11 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
             Rect handleRect = new Rect(handleX, handleY, handleWidth, handleH);
             context.DrawRectangle(handleBrush, null, handleRect, handleWidth * 0.5, handleWidth * 0.5);
         }
+
+        // TsnVoice 合成实际时值叠加：模型音素边界（主色竖线）、前置辅音区（淡底）、
+        // 主体起点（短刻度），数据来自渲染缓存，不影响卡片交互。
+        TsnVoiceTimingOverlay.Draw(context, Part, TickOffset, TickWidth,
+            topMargin, blockHeight, viewLeftTick, viewRightTick);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
