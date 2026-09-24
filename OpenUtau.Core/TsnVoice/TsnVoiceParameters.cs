@@ -69,7 +69,7 @@ namespace OpenUtau.Core.TsnVoice {
             }
         }
 
-        /// <summary>是否为引擎支持的语言。</summary>
+        /// <summary>是否为歌手支持的语言。</summary>
         public static bool IsSupportedLanguage(string language) {
             if (string.IsNullOrEmpty(language)) {
                 return false;
@@ -80,6 +80,77 @@ namespace OpenUtau.Core.TsnVoice {
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// 按歌词文字推断音符语言（跨语言演唱用）：
+        /// 谚文→韩语，假名→日语，汉字→中文（优先歌手主语言的中文变体），
+        /// 其余（拉丁文等）沿用歌手主语言（罗马音、拼音按主语言前端处理）。
+        /// 歌手不支持推断出的语言时抛错，不静默套用错误模型。
+        /// </summary>
+        public static string DetectNoteLanguage(
+            HashSet<string> supportedLanguages, string primaryLanguage, string lyric) {
+            string signal = null;
+            for (int i = 0; i < lyric.Length; i++) {
+                int code = lyric[i];
+                if (char.IsHighSurrogate(lyric[i]) && i + 1 < lyric.Length
+                    && char.IsLowSurrogate(lyric[i + 1])) {
+                    code = char.ConvertToUtf32(lyric, i);
+                    i++;
+                }
+                if ((code >= 0xAC00 && code <= 0xD7A3)
+                    || (code >= 0x1100 && code <= 0x11FF)
+                    || (code >= 0x3130 && code <= 0x318F)) {
+                    signal = "ko_KR";
+                    break;
+                }
+                if ((code >= 0x3040 && code <= 0x309F)
+                    || (code >= 0x30A0 && code <= 0x30FF)
+                    || (code >= 0x31F0 && code <= 0x31FF)) {
+                    signal = "ja_JP";
+                    break;
+                }
+                if ((code >= 0x3400 && code <= 0x4DBF)
+                    || (code >= 0x4E00 && code <= 0x9FFF)
+                    || (code >= 0x20000 && code <= 0x2EBEF)) {
+                    signal = "zh";
+                    break;
+                }
+            }
+            if (signal == null) {
+                return primaryLanguage;
+            }
+            if (signal == "zh") {
+                if (primaryLanguage == "zh_CN" || primaryLanguage == "zh_TW") {
+                    return primaryLanguage;
+                }
+                if (supportedLanguages.Contains("zh_CN")) {
+                    return "zh_CN";
+                }
+                if (supportedLanguages.Contains("zh_TW")) {
+                    return "zh_TW";
+                }
+            } else if (supportedLanguages.Contains(signal)) {
+                return signal;
+            }
+            throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
+                "当前语音不支持歌词语言（" + lyric + "），请使用支持该语言的跨语言版本");
+        }
+
+        /// <summary>
+        /// 是否为合法音素符号（SINGER2 音素均为 ASCII）。
+        /// 含非 ASCII 的多为转写失败回落的原文歌词，应交回推理内 G2P。
+        /// </summary>
+        public static bool IsPhonemeSymbol(string symbol) {
+            if (string.IsNullOrEmpty(symbol)) {
+                return false;
+            }
+            foreach (char c in symbol) {
+                if (c > 127) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>将文件名中的语言标记解析为引擎语言，失败时回退默认语言。</summary>
