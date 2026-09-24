@@ -248,9 +248,10 @@ namespace OpenUtau.Core.TsnVoice {
                 if (!inNodes) {
                     continue;
                 }
-                string[] columns = line.Split(
-                    new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (columns.Length < 4 || !int.TryParse(columns[0], out int index)) {
+                // 节点行：序号 + 问题名（可带引号含空格，对照原生 std::quoted）
+                // + 否分支 + 是分支。简单 Split 会拆散带空格的问题名。
+                List<string> columns = SplitNodeLine(line);
+                if (columns.Count < 4 || !int.TryParse(columns[0], out int index)) {
                     throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice, "HTS 决策节点格式错误");
                 }
                 string questionName = Unquote(columns[1]);
@@ -271,6 +272,40 @@ namespace OpenUtau.Core.TsnVoice {
             }
             if (result.Nodes.Count == 0) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice, "HTS 时长树没有节点");
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 切分决策节点行：引号段整体保留，对照原生 operator&gt;&gt; + std::quoted。
+        /// 无引号时与普通空白切分完全一致。
+        /// </summary>
+        static List<string> SplitNodeLine(string line) {
+            List<string> result = new List<string>();
+            int i = 0;
+            while (i < line.Length) {
+                while (i < line.Length && (line[i] == ' ' || line[i] == '\t')) {
+                    i++;
+                }
+                if (i >= line.Length) {
+                    break;
+                }
+                if (line[i] == '"') {
+                    int end = line.IndexOf('"', i + 1);
+                    if (end < 0) {
+                        result.Add(line.Substring(i));
+                        break;
+                    }
+                    result.Add(line.Substring(i, end - i + 1));
+                    i = end + 1;
+                } else {
+                    int end = i;
+                    while (end < line.Length && line[end] != ' ' && line[end] != '\t') {
+                        end++;
+                    }
+                    result.Add(line.Substring(i, end - i));
+                    i = end;
+                }
             }
             return result;
         }

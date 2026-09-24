@@ -1219,8 +1219,11 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 fraction?.Invoke((center + stride) / (double)paddedFrames);
             }
-            while (result.Count > rawExcitation.Length) {
-                result.RemoveAt(result.Count - 1);
+            // 对照原生 result.resize：裁去填充窗多余采样；RemoveRange 一次完成，
+            // 逐个 RemoveAt 为 O(n²)，长乐句会浪费数分钟。
+            if (result.Count > rawExcitation.Length) {
+                result.RemoveRange(rawExcitation.Length,
+                    result.Count - rawExcitation.Length);
             }
             return result.ToArray();
         }

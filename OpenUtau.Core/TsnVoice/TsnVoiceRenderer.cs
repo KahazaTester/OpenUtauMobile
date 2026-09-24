@@ -202,6 +202,13 @@ namespace OpenUtau.Core.TsnVoice {
                     null);
                 allSamples.AddRange(output.Samples);
                 allPitches.AddRange(output.Pitch);
+                double runSpanMs = runEndMs - runFirstMs;
+                double runAudioMs = output.Samples.Length * 1000.0
+                    / TsnVoiceParameters.NativeSampleRate;
+                Log.Information(
+                    "TsnVoice run {Index}/{Total}: 首音符 {First}ms 尾音符 {End}ms 跨度 {Span:F1}ms 音频 {Audio:F1}ms 音高点 {Pitches}",
+                    runIndex + 1, runs.Count, runFirstMs, runEndMs,
+                    runSpanMs, runAudioMs, output.Pitch.Count);
             }
             progressReported = lastProgress;
             if (allSamples.Count == 0) {
