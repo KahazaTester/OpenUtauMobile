@@ -266,15 +266,31 @@ namespace OpenUtau.Core.TsnVoice {
                 completedRuns++;
                 int runOffset48 = (int)Math.Round((runFirstMs - contentStartMs)
                     / 1000.0 * TsnVoiceParameters.NativeSampleRate);
-                int runCopy = Math.Min(output.Samples.Length,
-                    Math.Max(0, contentSamples48 - runOffset48));
+                // 超出乐谱跨度的 run 尾部不再截断：与参考实现一致，
+                // 整段音频参与混音（短音符 padding 导致 overrun 时尤其重要，
+                // 否则尾部被吃掉）；重叠区做加法混音，无重叠时与直接拷贝一致。
+                int runSkip = 0;
                 if (runOffset48 < 0) {
-                    int skip = Math.Min(-runOffset48, output.Samples.Length);
+                    runSkip = Math.Min(-runOffset48, output.Samples.Length);
                     runOffset48 = 0;
-                    runCopy = Math.Min(output.Samples.Length - skip, contentSamples48);
-                    Array.Copy(output.Samples, skip, mixed48, 0, runCopy);
+                }
+                int runCopy = output.Samples.Length - runSkip;
+                if (runCopy <= 0) {
+                    Log.Warning("TsnVoice run {Index}/{Total} 音频完全落在槽位之前，已跳过",
+                        runIndex + 1, runs.Count);
                 } else {
-                    Array.Copy(output.Samples, 0, mixed48, runOffset48, runCopy);
+                    int need = runOffset48 + runCopy;
+                    if (need > mixed48.Length) {
+                        Log.Warning(
+                            "TsnVoice run {Index}/{Total} 音频超出乐谱跨度 {Over:F1}ms，扩展混音缓冲",
+                            runIndex + 1, runs.Count,
+                            (need - mixed48.Length) * 1000.0
+                                / TsnVoiceParameters.NativeSampleRate);
+                        Array.Resize(ref mixed48, need);
+                    }
+                    for (int i = 0; i < runCopy; i++) {
+                        mixed48[runOffset48 + i] += output.Samples[runSkip + i];
+                    }
                 }
                 double runSpanMs = runEndMs - runFirstMs;
                 double runAudioMs = output.Samples.Length * 1000.0
@@ -333,8 +349,6 @@ namespace OpenUtau.Core.TsnVoice {
             Dictionary<int, List<RenderPhone>> phonesByNote, List<string> noteLanguages,
             List<int> sungIdx, int runStart, int runEndExclusive, double originMs) {
             List<TsnVoiceInputNote> notes = new List<TsnVoiceInputNote>();
-            int prevTone = phrase.notes[sungIdx[runStart]].tone;
-            double prevBase = phrase.notes[sungIdx[runStart]].adjustedTone;
             for (int s = runStart; s < runEndExclusive; s++) {
                 int i = sungIdx[s];
                 RenderNote note = phrase.notes[i];
@@ -362,12 +376,10 @@ namespace OpenUtau.Core.TsnVoice {
                 input.IsContinuation = isDash && !dashPinnedOverride
                     && s > runStart && adjacent;
                 if (input.IsContinuation) {
-                    // 延续音沿用前一实质音符的基音，保持短语内音高上下文连续。
-                    input.MidiPitch = prevTone;
-                    input.BaseMidiPitch = prevBase;
-                } else {
-                    prevTone = note.tone;
-                    prevBase = input.BaseMidiPitch;
+                    // 延续音跟随自身调号：同调时与旧行为一致，
+                    // 跨调 - /+ 滑向新调；发音与上下文仍归属前一实质音符。
+                    input.MidiPitch = note.tone;
+                    input.BaseMidiPitch = Math.Clamp((double)note.adjustedTone, 0.0, 127.0);
                 }
                 if (isDash && !input.IsContinuation && !dashPinnedOverride) {
                     // 句首或断开的延续符无法归属前一发音：记错并以静音占据，
@@ -542,7 +554,11 @@ namespace OpenUtau.Core.TsnVoice {
             return false;
         }
 
-        static int OwnerIndexAt(RenderPhrase phrase, double ms) {
+        /// <summary>
+        /// 帧归属音符（按时间，不回溯）：延续/ sustain 帧归属自身音符，
+        /// 各自调号决定音高，跨调 - /+ 滑向新调而非钉在旧调。
+        /// </summary>
+        static int NoteIndexAt(RenderPhrase phrase, double ms) {
             int owner = phrase.notes.Length - 1;
             for (int i = 0; i < phrase.notes.Length; i++) {
                 if (phrase.notes[i].positionMs <= ms) {
@@ -551,17 +567,20 @@ namespace OpenUtau.Core.TsnVoice {
                     break;
                 }
             }
-            // 延续音符与 sustain 延长归属前一实质音符，与其共享发音与音高模式。
+            return owner;
+        }
+
+        /// <summary>
+        /// 自动资格回溯：延续音符与 sustain 延长沿用前一实质音符的
+        ///新建/手调标记（自身不带标记时），仅决定是否自动，不决定音高。
+        /// </summary>
+        static int AutoRefIndexAt(RenderPhrase phrase, int owner) {
             while (owner > 0
                 && (phrase.notes[owner].lyric == TsnVoiceParameters.ContinuationLyric
                     || phrase.notes[owner].lyric.StartsWith("+"))) {
                 owner--;
             }
             return owner;
-        }
-
-        static RenderNote OwnerNoteAt(RenderPhrase phrase, double ms) {
-            return phrase.notes[OwnerIndexAt(phrase, ms)];
         }
 
         static List<TsnVoicePitchPoint> SamplePitch(RenderPhrase phrase,
@@ -574,9 +593,10 @@ namespace OpenUtau.Core.TsnVoice {
                 int ticks = phrase.timeAxis.MsPosToTickPos(ms)
                     - (phrase.position - phrase.leading);
                 int index = Math.Clamp(ticks / pitchInterval, 0, phrase.pitches.Length - 1);
-                int ownerIndex = OwnerIndexAt(phrase, ms);
+                int ownerIndex = NoteIndexAt(phrase, ms);
                 RenderNote owner = phrase.notes[ownerIndex];
-                bool auto = autoEnabled && autoNote[ownerIndex];
+                // 资格向上继承，音高取当前音符自身调号。
+                bool auto = autoEnabled && autoNote[AutoRefIndexAt(phrase, ownerIndex)];
                 double midi;
                 if (!auto) {
                     // 手绘/既有音高：整体按绝对音高约束，原样保留调音。
