@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -267,6 +268,13 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
         double envelopeTopY = TopMargin + LabelHeight + 4.0;
         double envelopeHeight = Math.Max(20.0, totalHeight - envelopeTopY - BottomMargin);
 
+        // TSNVOICE 显示模型实际时值：被模型覆盖的管线 phone（含包络）跳过，
+        // 循环后统一绘制模型标签。
+        bool showModel = TsnVoiceTimingOverlay.IsTsnVoicePart(Part);
+        List<TsnVoiceModelSpan> modelSpans = showModel
+            ? TsnVoiceTimingOverlay.GetPhones(Part)
+            : new List<TsnVoiceModelSpan>();
+
         foreach (UPhoneme phoneme in Part.phonemes)
         {
             if (phoneme.Parent == null || phoneme.Parent.OverlapError)
@@ -276,6 +284,12 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
 
             double phonemeAbsStart = partPos + phoneme.position;
             double phonemeAbsEnd = partPos + phoneme.End;
+
+            if (showModel && TsnVoiceTimingOverlay.IsCovered(
+                modelSpans, phonemeAbsStart, phonemeAbsEnd))
+            {
+                continue;
+            }
 
             if (phonemeAbsEnd < viewLeftTick || phonemeAbsStart > viewRightTick)
             {
@@ -375,15 +389,39 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
             }
         }
 
+        // TSNVOICE 模型标签：与管线同样式、无包络（仅展示）。
+        foreach (TsnVoiceModelSpan span in modelSpans)
+        {
+            if (span.AbsEndTick < viewLeftTick || span.AbsStartTick > viewRightTick)
+            {
+                continue;
+            }
+
+            double posX = (span.AbsStartTick - TickOffset) * TickWidth;
+            double lineBottom = envelopeTopY + envelopeHeight + 2.0;
+            context.DrawLine(timingPen, new Point(posX, TopMargin + 2.0), new Point(posX, lineBottom));
+
+            if (string.IsNullOrEmpty(span.Symbol))
+            {
+                continue;
+            }
+            TextLayout textLayout = TextLayoutCache.Get(span.Symbol, textBrush, 11, false);
+            double pillWidth = textLayout.Width + 8.0;
+            double pillHeight = textLayout.Height + 2.0;
+            double pillX = posX + 2.0;
+
+            Rect pillRect = new Rect(pillX, labelY, pillWidth, pillHeight);
+            context.DrawRectangle(textBgBrush, textBorderPen, pillRect, 3, 3);
+            using (context.PushTransform(Matrix.CreateTranslation(pillX + 4.0, labelY + 1.0)))
+            {
+                textLayout.Draw(context, new Point(0, 0));
+            }
+        }
+
         if (_activeHandleType != AdvancedHandleType.None)
         {
             RenderResetTarget(context);
         }
-
-        // TsnVoice 合成实际时值叠加：模型音素边界（主色竖线）、前置辅音区（淡底）、
-        // 主体起点（短刻度），数据来自渲染缓存，不影响包络交互。
-        TsnVoiceTimingOverlay.Draw(context, Part, TickOffset, TickWidth,
-            envelopeTopY, envelopeHeight, viewLeftTick, viewRightTick);
     }
 
     private void RenderResetTarget(DrawingContext context)

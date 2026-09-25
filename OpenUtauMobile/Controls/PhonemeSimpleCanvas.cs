@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenUtauMobile.Controls.Tokens;
 using Avalonia;
 using Avalonia.Controls;
@@ -196,6 +197,12 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
         const double bottomMargin = 6.0;
         double blockHeight = Math.Max(16.0, canvasHeight - topMargin - bottomMargin);
 
+        // TSNVOICE 显示模型实际时值：被模型覆盖的管线卡片跳过，循环后统一绘制模型卡片。
+        bool showModel = TsnVoiceTimingOverlay.IsTsnVoicePart(Part);
+        List<TsnVoiceModelSpan> modelSpans = showModel
+            ? TsnVoiceTimingOverlay.GetPhones(Part)
+            : new List<TsnVoiceModelSpan>();
+
         foreach (UPhoneme phoneme in Part.phonemes)
         {
             if (phoneme.Parent == null)
@@ -206,11 +213,15 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
             double phonemeAbsStart = partPos + phoneme.position;
             double phonemeAbsEnd = partPos + phoneme.End;
 
+            if (showModel && TsnVoiceTimingOverlay.IsCovered(
+                modelSpans, phonemeAbsStart, phonemeAbsEnd))
+            {
+                continue;
+            }
             if (phonemeAbsEnd < viewLeftTick || phonemeAbsStart > viewRightTick)
             {
                 continue;
             }
-
             double x1 = (phonemeAbsStart - TickOffset) * TickWidth;
             double x2 = (phonemeAbsEnd - TickOffset) * TickWidth;
 
@@ -273,10 +284,41 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
             context.DrawRectangle(handleBrush, null, handleRect, handleWidth * 0.5, handleWidth * 0.5);
         }
 
-        // TsnVoice 合成实际时值叠加：模型音素边界（主色竖线）、前置辅音区（淡底）、
-        // 主体起点（短刻度），数据来自渲染缓存，不影响卡片交互。
-        TsnVoiceTimingOverlay.Draw(context, Part, TickOffset, TickWidth,
-            topMargin, blockHeight, viewLeftTick, viewRightTick);
+        // TSNVOICE 模型卡片：与管线同样式、无边界手柄（仅展示）。
+        // 双击仍走既有管线命中（同跨度内音素），别名编辑不受影响。
+        foreach (TsnVoiceModelSpan span in modelSpans)
+        {
+            if (span.AbsEndTick < viewLeftTick || span.AbsStartTick > viewRightTick)
+            {
+                continue;
+            }
+
+            double x1 = (span.AbsStartTick - TickOffset) * TickWidth;
+            double x2 = (span.AbsEndTick - TickOffset) * TickWidth;
+
+            double totalWidth = x2 - x1;
+            double actualMargin = Math.Min(ChipMargin, Math.Max(1.0, totalWidth * 0.15));
+            double chipLeft = x1 + actualMargin;
+            double chipRight = x2 - actualMargin;
+            double chipWidth = Math.Max(2.0, chipRight - chipLeft);
+
+            Rect blockRect = new Rect(chipLeft, topMargin, chipWidth, blockHeight);
+            context.DrawRectangle(defaultChipFill, chipBorderPen, blockRect, 4, 4);
+
+            if (!string.IsNullOrEmpty(span.Symbol) && chipWidth > 8.0)
+            {
+                TextLayout textLayout = TextLayoutCache.Get(span.Symbol, textBrush, 12, false);
+                if (textLayout.Width <= chipWidth - 4.0)
+                {
+                    double textX = chipLeft + (chipWidth - textLayout.Width) * 0.5;
+                    double textY = topMargin + (blockHeight - textLayout.Height) * 0.5;
+                    using (context.PushTransform(Matrix.CreateTranslation(textX, textY)))
+                    {
+                        textLayout.Draw(context, new Point(0, 0));
+                    }
+                }
+            }
+        }
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
