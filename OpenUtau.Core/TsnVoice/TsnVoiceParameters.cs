@@ -352,6 +352,49 @@ namespace OpenUtau.Core.TsnVoice {
                 out int index) && index >= 1;
         }
 
+        /// <summary>
+        /// 逐帧表情权重：按音符起始帧分段线性插值（上一音符值→下一音符值），
+        /// 首段之前与末段之后钳制；凸组合保持归一。
+        /// </summary>
+        public static double[][] InterpolateNoteWeights(
+            List<double[]> normalizedPerNote, List<int> noteStartFrames, int frames) {
+            int count = normalizedPerNote.Count;
+            double[][] result = new double[Math.Max(0, frames)][];
+            if (count == 0 || frames <= 0) {
+                return result;
+            }
+            List<int> order = new List<int>(count);
+            for (int i = 0; i < count; i++) {
+                order.Add(i);
+            }
+            order.Sort((a, b) => noteStartFrames[a].CompareTo(noteStartFrames[b]));
+            int dimensions = normalizedPerNote[0].Length;
+            int segment = 0;
+            for (int frame = 0; frame < frames; frame++) {
+                while (segment + 1 < order.Count
+                    && frame >= noteStartFrames[order[segment + 1]]) {
+                    segment++;
+                }
+                double[] weights = new double[dimensions];
+                if (segment + 1 >= order.Count) {
+                    Array.Copy(normalizedPerNote[order[segment]], weights, dimensions);
+                } else {
+                    int start = noteStartFrames[order[segment]];
+                    int end = noteStartFrames[order[segment + 1]];
+                    double ratio = end <= start
+                        ? 1.0
+                        : Math.Clamp((double)(frame - start) / (end - start), 0.0, 1.0);
+                    double[] left = normalizedPerNote[order[segment]];
+                    double[] right = normalizedPerNote[order[segment + 1]];
+                    for (int i = 0; i < dimensions; i++) {
+                        weights[i] = left[i] + (right[i] - left[i]) * ratio;
+                    }
+                }
+                result[frame] = weights;
+            }
+            return result;
+        }
+
         /// <summary>表情缩写对应的矩阵行号（0 起），非法返回 -1。</summary>
         public static int EmotionRowIndex(string abbr) {
             if (!IsEmotionAbbr(abbr)

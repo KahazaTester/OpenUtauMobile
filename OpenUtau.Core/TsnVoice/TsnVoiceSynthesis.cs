@@ -1001,8 +1001,8 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>
         /// 逐帧表情条件矩阵：单行/缺省时退化为首行重复（与旧行为一致）；
-        /// 多行时按音素归属的音符权重逐帧混合（归一规则见二进制全局混合语义），
-        /// 无归属帧（首尾静默）沿用最近音符。
+        /// 多行时按音符起始值逐帧线性过渡（音素归属决定音符，首尾静默钳制），
+        /// 归一规则见二进制全局混合语义。
         /// </summary>
         static float[,] BuildEmotionMatrix(TsnVoicePackage voice, PreparedScore score,
             List<TsnVoiceInputNote> notes, List<double[]> weightsPerNote) {
@@ -1013,45 +1013,44 @@ namespace OpenUtau.Core.TsnVoice {
                 return RepeatedCode(frames,
                     rows.Count == 0 ? Array.Empty<float>() : rows[0]);
             }
-            double[][] normalized = new double[notes.Count][];
+            List<double[]> normalized = new List<double[]>(notes.Count);
             for (int n = 0; n < notes.Count; n++) {
                 double[] raw = weightsPerNote != null && n < weightsPerNote.Count
                     && weightsPerNote[n] != null
                     ? weightsPerNote[n]
                     : new double[] { 1.0 };
-                normalized[n] = TsnVoiceParameters.NormalizeEmotionWeights(
-                    raw, rows.Count);
-            }
-            int[] framePhone = new int[frames];
-            for (int i = 0; i < frames; i++) {
-                framePhone[i] = -1;
-            }
-            foreach (TsnVoiceStateTiming timing in score.Duration.Timings) {
-                for (int frame = timing.StartFrame;
-                    frame < timing.EndFrame && frame < frames; frame++) {
-                    if (frame >= 0) {
-                        framePhone[frame] = timing.PhonemeIndex;
-                    }
-                }
+                normalized.Add(TsnVoiceParameters.NormalizeEmotionWeights(
+                    raw, rows.Count));
             }
             Dictionary<string, int> noteIndexById =
                 new Dictionary<string, int>(StringComparer.Ordinal);
             for (int n = 0; n < notes.Count; n++) {
                 noteIndexById[notes[n].Id] = n;
             }
-            float[,] result = new float[frames, rows[0].Length];
-            int fallback = 0;
-            for (int frame = 0; frame < frames; frame++) {
-                int note = fallback;
-                int phone = framePhone[frame];
-                if (phone >= 0 && phone < score.PhoneNoteIds.Count) {
-                    string id = score.PhoneNoteIds[phone];
-                    if (id != null && noteIndexById.TryGetValue(id, out int found)) {
-                        note = found;
-                        fallback = found;
+            List<int> noteStartFrames = new List<int>(notes.Count);
+            for (int n = 0; n < notes.Count; n++) {
+                noteStartFrames.Add(int.MaxValue);
+            }
+            for (int phone = 0; phone < score.PhoneNoteIds.Count
+                && phone < score.PhoneStarts.Count; phone++) {
+                string id = score.PhoneNoteIds[phone];
+                if (id != null && noteIndexById.TryGetValue(id, out int n)) {
+                    int start = score.PhoneStarts[phone];
+                    if (start < noteStartFrames[n]) {
+                        noteStartFrames[n] = start;
                     }
                 }
-                double[] weights = normalized[note];
+            }
+            for (int n = 0; n < notes.Count; n++) {
+                if (noteStartFrames[n] == int.MaxValue) {
+                    noteStartFrames[n] = n == 0 ? 0 : noteStartFrames[n - 1];
+                }
+            }
+            double[][] frameWeights = TsnVoiceParameters.InterpolateNoteWeights(
+                normalized, noteStartFrames, frames);
+            float[,] result = new float[frames, rows[0].Length];
+            for (int frame = 0; frame < frames; frame++) {
+                double[] weights = frameWeights[frame];
                 for (int i = 0; i < rows.Count; i++) {
                     float[] row = rows[i];
                     double weight = weights[i];
