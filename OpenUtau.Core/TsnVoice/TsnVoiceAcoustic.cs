@@ -79,18 +79,21 @@ namespace OpenUtau.Core.TsnVoice {
             for (int i = 0; i < names.Length; i++) {
                 byName[names[i]] = dimensions[i];
             }
-            // 分流拼接与二进制一致（CreateMgcStructure/CreateBapStructure，
-            // MGC0/MGC1、BAP0/BAP1 优先于整体 MGC/BAP）：
+            // 分流拼接与二进制一致（CreateMgcStructure/CreateBapStructure）：
+            // MGC0 仅在恰为 1 维时作为独立增益流配对 MGC1（此时声学 DNN
+            // 输出对应 MGC1，含 c0 位；c0 本体由 stage1 给出，桥接不管 MGC0），
+            // 否则回退整体 MGC；BAP 取 BAP0+BAP1（无则整体 BAP）。
             // 声学 DNN 输出按拼接后的 MGC/BAP/LAT 排布，其余流（LF0/VIB 等）
             // 由各自管线消费，此处不参与。
             int mgc;
-            if (byName.ContainsKey("MGC0") && byName.ContainsKey("MGC1")) {
-                mgc = byName["MGC0"] + byName["MGC1"];
+            if (byName.TryGetValue("MGC0", out int mgc0) && mgc0 == 1
+                && byName.TryGetValue("MGC1", out int mgc1)) {
+                mgc = mgc1;
             } else if (byName.ContainsKey("MGC")) {
                 mgc = byName["MGC"];
             } else {
                 throw new TsnVoiceException(TsnVoiceStatus.Unsupported,
-                    "推理需要 MGC（或 MGC0+MGC1）声学特征；该语音声明为 " + namesEntry);
+                    "推理需要 MGC（或 1 维 MGC0+MGC1）声学特征；该语音声明为 " + namesEntry);
             }
             int bap;
             if (byName.ContainsKey("BAP0") && byName.ContainsKey("BAP1")) {
