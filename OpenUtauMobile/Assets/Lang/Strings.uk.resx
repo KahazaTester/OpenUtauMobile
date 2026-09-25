@@ -516,7 +516,7 @@
     <value>Видалити зі списку</value>
   </data>
   <data name="Home.Brand.Name" xml:space="preserve">
-    <value>OpenUtau Mobile</value>
+    <value>OpenPSUV Mobile</value>
   </data>
   <data name="Home.Recovery.Message" xml:space="preserve">
     <value>Відновлено після аварійного завершення: </value>
@@ -1020,7 +1020,7 @@
     <value>Сторонні бібліотеки та учасники</value>
   </data>
   <data name="About.Contribute" xml:space="preserve">
-    <value>Допоможіть покращити OpenUtau Mobile</value>
+    <value>Допоможіть покращити OpenPSUV Mobile</value>
   </data>
   <data name="About.Contribute.Desc" xml:space="preserve">
     <value>Повідомити про помилку | Запропонувати функцію | Зробити внесок у код</value>
@@ -1038,7 +1038,7 @@
     <value>Не вдалося відкрити посилання</value>
   </data>
   <data name="ErrorDialog.Title" xml:space="preserve">
-    <value>Помилка виконання OpenUtau Mobile</value>
+    <value>Помилка виконання OpenPSUV Mobile</value>
   </data>
   <data name="ErrorDialog.UnknownError" xml:space="preserve">
     <value>Невідома помилка</value>
@@ -1440,7 +1440,7 @@
     <value>Ласкаво просимо</value>
   </data>
   <data name="SetupWizard.Step0.Desc" xml:space="preserve">
-    <value>OpenUtau Mobile — це кросплатформний редактор синтезу вокалу, що підтримує UTAU, DiffSinger, Vogen та інші рушії. Приділіть хвилину базовому налаштуванню, щоб почати творити.</value>
+    <value>OpenPSUV Mobile — це кросплатформний редактор синтезу вокалу, що підтримує UTAU, DiffSinger, Vogen та інші рушії. Приділіть хвилину базовому налаштуванню, щоб почати творити.</value>
   </data>
   <data name="SetupWizard.Step0.Skip" xml:space="preserve">
     <value>Пропустити</value>
@@ -1494,7 +1494,7 @@
     <value>Налаштування завершено</value>
   </data>
   <data name="SetupWizard.Step3.Desc" xml:space="preserve">
-    <value>Ви готові використовувати OpenUtau Mobile!</value>
+    <value>Ви готові використовувати OpenPSUV Mobile!</value>
   </data>
   <data name="SetupWizard.Finish" xml:space="preserve">
     <value>Готово</value>

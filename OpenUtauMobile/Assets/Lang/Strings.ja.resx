@@ -584,7 +584,7 @@
     <value>リストから削除</value>
   </data>
   <data name="Home.Brand.Name" xml:space="preserve">
-    <value>OpenUtau Mobile</value>
+    <value>OpenPSUV Mobile</value>
   </data>
   <data name="Home.Recovery.Message" xml:space="preserve">
     <value>前回の異常終了から復旧可能なプロジェクト：</value>
@@ -1094,7 +1094,7 @@
     <value>使用した外部ライブラリと貢献者</value>
   </data>
   <data name="About.Contribute" xml:space="preserve">
-    <value>OpenUtau Mobile をより良くする</value>
+    <value>OpenPSUV Mobile をより良くする</value>
   </data>
   <data name="About.Contribute.Desc" xml:space="preserve">
     <value>バグ報告 | 機能提案 | コード貢献</value>
@@ -1112,7 +1112,7 @@
     <value>リンクを開けませんでした</value>
   </data>
   <data name="ErrorDialog.Title" xml:space="preserve">
-    <value>OpenUtau Mobile 実行時エラー</value>
+    <value>OpenPSUV Mobile 実行時エラー</value>
   </data>
   <data name="ErrorDialog.UnknownError" xml:space="preserve">
     <value>不明なエラー</value>
@@ -1517,7 +1517,7 @@
     <value>ようこそ</value>
   </data>
   <data name="SetupWizard.Step0.Desc" xml:space="preserve">
-    <value>OpenUtau Mobile は、UTAU、DiffSinger、Vogen など複数のエンジンに対応したクロスプラットフォームの歌声合成エディタです。基本設定を行い、すぐに創作を始めましょう。</value>
+    <value>OpenPSUV Mobile は、UTAU、DiffSinger、Vogen など複数のエンジンに対応したクロスプラットフォームの歌声合成エディタです。基本設定を行い、すぐに創作を始めましょう。</value>
   </data>
   <data name="SetupWizard.Step0.Skip" xml:space="preserve">
     <value>スキップ</value>
@@ -1571,7 +1571,7 @@
     <value>セットアップ完了</value>
   </data>
   <data name="SetupWizard.Step3.Desc" xml:space="preserve">
-    <value>OpenUtau Mobile を使い始める準備ができました！</value>
+    <value>OpenPSUV Mobile を使い始める準備ができました！</value>
   </data>
   <data name="SetupWizard.Finish" xml:space="preserve">
     <value>完了</value>

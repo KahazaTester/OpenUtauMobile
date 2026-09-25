@@ -5,7 +5,7 @@
         <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
         <Nullable>enable</Nullable>
         <ApplicationId>$(BaseApplicationId)</ApplicationId>
-        <ApplicationTitle>OpenUtau Mobile 预览版</ApplicationTitle>
+        <ApplicationTitle>OpenPSUV Mobile 预览版</ApplicationTitle>
         <AndroidPackageFormat>apk</AndroidPackageFormat>
         <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
         <!-- 大堆内存 -->

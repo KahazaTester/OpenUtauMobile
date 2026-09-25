@@ -7,6 +7,6 @@
         x:Class="OpenUtauMobile.Views.MainWindow"
         Width="880" Height="400"
         Icon="/Assets/openutau.ico"
-        Title="OpenUtau Mobile">
+        Title="OpenPSUV Mobile">
     <views:MainView />
 </Window>

@@ -587,7 +587,7 @@
     <value>从列表移除</value>
   </data>
   <data name="Home.Brand.Name" xml:space="preserve">
-    <value>OpenUtau Mobile</value>
+    <value>OpenPSUV Mobile</value>
   </data>
   <data name="Home.Recovery.Message" xml:space="preserve">
     <value>上次异常退出，有可恢复的工程：</value>
@@ -1097,7 +1097,7 @@
     <value>引用的外部库与贡献者</value>
   </data>
   <data name="About.Contribute" xml:space="preserve">
-    <value>帮助 OpenUtau Mobile 变得更好</value>
+    <value>帮助 OpenPSUV Mobile 变得更好</value>
   </data>
   <data name="About.Contribute.Desc" xml:space="preserve">
     <value>反馈 Bug | 功能建议 | 贡献代码</value>
@@ -1115,7 +1115,7 @@
     <value>无法打开链接</value>
   </data>
   <data name="ErrorDialog.Title" xml:space="preserve">
-    <value>OpenUtau Mobile 运行时错误</value>
+    <value>OpenPSUV Mobile 运行时错误</value>
   </data>
   <data name="ErrorDialog.UnknownError" xml:space="preserve">
     <value>未知错误</value>
@@ -1520,7 +1520,7 @@
     <value>欢迎使用</value>
   </data>
   <data name="SetupWizard.Step0.Desc" xml:space="preserve">
-    <value>OpenUtau Mobile 是一款跨平台歌声合成编辑器，支持 UTAU、DiffSinger、Vogen 等多种引擎。让我们花一分钟完成基本设置，即可开始创作。</value>
+    <value>OpenPSUV Mobile 是一款跨平台歌声合成编辑器，支持 UTAU、DiffSinger、Vogen 等多种引擎。让我们花一分钟完成基本设置，即可开始创作。</value>
   </data>
   <data name="SetupWizard.Step0.Skip" xml:space="preserve">
     <value>跳过向导</value>
@@ -1574,7 +1574,7 @@
     <value>设置完成</value>
   </data>
   <data name="SetupWizard.Step3.Desc" xml:space="preserve">
-    <value>你现在可以开始使用 OpenUtau Mobile 了！</value>
+    <value>你现在可以开始使用 OpenPSUV Mobile 了！</value>
   </data>
   <data name="SetupWizard.Finish" xml:space="preserve">
     <value>完成</value>
