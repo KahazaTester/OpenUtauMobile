@@ -209,9 +209,59 @@ namespace OpenUtau.Core.TsnVoice {
             return matches[0];
         }
 
+        /// <summary>
+        /// 前导数值解析，对照 std::stod：跳过空白，取符号/整数/小数/指数前缀，
+        /// 尾随杂质忽略；无数字则失败。
+        /// </summary>
+        static bool TryParseLeadingDouble(string value, out double number) {
+            number = 0;
+            int i = 0;
+            while (i < value.Length && char.IsWhiteSpace(value[i])) {
+                i++;
+            }
+            int start = i;
+            if (i < value.Length && (value[i] == '+' || value[i] == '-')) {
+                i++;
+            }
+            bool digits = false;
+            while (i < value.Length && value[i] >= '0' && value[i] <= '9') {
+                i++;
+                digits = true;
+            }
+            if (i < value.Length && value[i] == '.') {
+                i++;
+                while (i < value.Length && value[i] >= '0' && value[i] <= '9') {
+                    i++;
+                    digits = true;
+                }
+            }
+            if (digits && i < value.Length && (value[i] == 'e' || value[i] == 'E')) {
+                int j = i + 1;
+                if (j < value.Length && (value[j] == '+' || value[j] == '-')) {
+                    j++;
+                }
+                int k = j;
+                while (k < value.Length && value[k] >= '0' && value[k] <= '9') {
+                    k++;
+                }
+                if (k > j) {
+                    i = k;
+                }
+            }
+            if (!digits) {
+                return false;
+            }
+            if (!double.TryParse(value.Substring(start, i - start),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out number)
+                || double.IsNaN(number) || double.IsInfinity(number)) {
+                return false;
+            }
+            return true;
+        }
+
         static double Normalize(double value, double minimum, double maximum,
-            double clipMinimum, double clipMaximum) {
-            double clipped = Math.Clamp(value, clipMinimum, clipMaximum);
+            double clipMinimum, double clipMaximum) {            double clipped = Math.Clamp(value, clipMinimum, clipMaximum);
             if (clipped <= minimum) {
                 return 0;
             }
@@ -415,10 +465,8 @@ namespace OpenUtau.Core.TsnVoice {
                     case Kind.Numeric: {
                             string field = label.Get(question.Category, question.FieldIndex);
                             if (field != "x" && field != "xx") {
-                                if (!double.TryParse(field,
-                                    System.Globalization.NumberStyles.Float,
-                                    System.Globalization.CultureInfo.InvariantCulture,
-                                    out double number)) {
+                                // 对照原生 std::stod：取前导数值部分，尾随杂质忽略。
+                                if (!TryParseLeadingDouble(field, out double number)) {
                                     throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
                                         "标签数值字段不是数字");
                                 }

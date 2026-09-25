@@ -128,11 +128,14 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>
         /// 单个语音的缓存句柄：解析包、会话与渲染锁。
+        /// 解析后的问题集随句柄缓存（纯解析结果复用，数值与逐次解析一致）。
         /// </summary>
         public class TsnVoiceVoiceHandle {
             public TsnVoicePackage Package;
             public Dictionary<string, SessionEntry> Sessions =
                 new Dictionary<string, SessionEntry>(StringComparer.Ordinal);
+            public Dictionary<string, object> QuestionCache =
+                new Dictionary<string, object>(StringComparer.Ordinal);
             public readonly object SyncRoot = new object();
         }
 

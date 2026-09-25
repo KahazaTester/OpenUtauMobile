@@ -840,14 +840,48 @@ namespace OpenUtau.Core.TsnVoice {
             return result;
         }
 
+        static TsnVoiceBinaryQuestions GetUniqueQuestions(
+            TsnVoiceVoiceHandle handle, TsnVoicePackage voice,
+            string language, int dimensions) {
+            string key = "unique:" + language + ":" + dimensions;
+            lock (handle.SyncRoot) {
+                if (handle.QuestionCache.TryGetValue(key, out object cached)) {
+                    return (TsnVoiceBinaryQuestions)cached;
+                }
+            }
+            TsnVoiceBinaryQuestions parsed = TsnVoiceBinaryQuestions.Parse(
+                voice.GetLanguageQuestions(language), dimensions);
+            lock (handle.SyncRoot) {
+                handle.QuestionCache[key] = parsed;
+            }
+            return parsed;
+        }
+
+        static TsnVoiceContextQuestions GetContextQuestions(
+            TsnVoiceVoiceHandle handle, string tag, byte[] source, int dimensions) {
+            string key = "context:" + tag + ":" + dimensions;
+            lock (handle.SyncRoot) {
+                if (handle.QuestionCache.TryGetValue(key, out object cached)) {
+                    return (TsnVoiceContextQuestions)cached;
+                }
+            }
+            TsnVoiceContextQuestions parsed = TsnVoiceContextQuestions.Parse(
+                source, dimensions);
+            lock (handle.SyncRoot) {
+                handle.QuestionCache[key] = parsed;
+            }
+            return parsed;
+        }
+
         static float[,] LegacyLinguisticFeatures(TsnVoicePackage voice,
-            Dictionary<string, SessionEntry> sessions, PreparedScore score,
+            TsnVoiceVoiceHandle handle, Dictionary<string, SessionEntry> sessions,
+            PreparedScore score,
             out float[,] frameContext, Action<double> fraction = null) {
             SessionEntry model = GetModel(sessions, "linguistic");
             int statePhonemeDimensions = ModelInputDimensions(model);
             int totalDimensions = statePhonemeDimensions + 5;
-            TsnVoiceContextQuestions questions = TsnVoiceContextQuestions.Parse(
-                voice.LabelFeatureRules, totalDimensions);
+            TsnVoiceContextQuestions questions = GetContextQuestions(handle,
+                "legacy", voice.LabelFeatureRules, totalDimensions);
             int frames = score.Duration.FrameCount;
             float[,] contexts = new float[frames, statePhonemeDimensions];
             frameContext = new float[frames, 5];
@@ -879,13 +913,14 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         static float[,] ModernLinguisticFeatures(TsnVoicePackage voice,
-            Dictionary<string, SessionEntry> sessions, PreparedScore score,
+            TsnVoiceVoiceHandle handle, Dictionary<string, SessionEntry> sessions,
+            PreparedScore score,
             string language, out float[,] frameContext,
             Action<double> fraction = null) {
             SessionEntry uniqueModel = GetModel(sessions, "unique_context:" + language);
             int uniqueDimensions = ModelInputDimensions(uniqueModel);
-            TsnVoiceBinaryQuestions uniqueQuestions = TsnVoiceBinaryQuestions.Parse(
-                voice.GetLanguageQuestions(language), uniqueDimensions);
+            TsnVoiceBinaryQuestions uniqueQuestions = GetUniqueQuestions(handle,
+                voice, language, uniqueDimensions);
             float[,] uniqueContext =
                 new float[score.Labels.Count, uniqueDimensions];
             for (int phone = 0; phone < score.Labels.Count; phone++) {
@@ -898,8 +933,8 @@ namespace OpenUtau.Core.TsnVoice {
                 f => fraction?.Invoke(f * 0.2));
             SessionEntry commonModel = GetModel(sessions, "common_context");
             int commonDimensions = ModelInputDimensions(commonModel);
-            TsnVoiceContextQuestions commonQuestions = TsnVoiceContextQuestions.Parse(
-                voice.CommonQuestions, commonDimensions);
+            TsnVoiceContextQuestions commonQuestions = GetContextQuestions(handle,
+                "common", voice.CommonQuestions, commonDimensions);
             int frames = score.Duration.FrameCount;
             float[,] commonContext = new float[frames, commonDimensions];
             float[,] repeatedUnique =
@@ -1333,14 +1368,15 @@ namespace OpenUtau.Core.TsnVoice {
                 reportMetadata(BuildMetadata(score, notes, sampleRate, framePeriod));
             }
             Dictionary<string, SessionEntry> sessions = GetSessions(voice);
+            TsnVoiceVoiceHandle handle = GetVoiceHandle(voice.SourcePath);
             float[,] frameContext;
             float[,] linguistic;
             if (voice.LegacyContextLayout) {
-                linguistic = LegacyLinguisticFeatures(voice, sessions, score,
+                linguistic = LegacyLinguisticFeatures(voice, handle, sessions, score,
                     out frameContext,
                     f => reportProgress(0.12f + (float)(0.22 * f), "linguistic"));
             } else {
-                linguistic = ModernLinguisticFeatures(voice, sessions, score,
+                linguistic = ModernLinguisticFeatures(voice, handle, sessions, score,
                     notes[0].Language, out frameContext,
                     f => reportProgress(0.12f + (float)(0.22 * f), "linguistic"));
             }

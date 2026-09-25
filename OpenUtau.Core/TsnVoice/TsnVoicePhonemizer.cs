@@ -28,7 +28,51 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         protected virtual TsnVoicePronunciation LookupLyric(string lyric) {
-            string language = EngineLanguage;
+            // 主语言优先，其余按语音记录顺序回退：跨语言音符在面板同样转写成功，
+            // 不再误标错误；渲染侧以相同顺序解析，结果一致。
+            List<string> candidates = new List<string>();
+            candidates.Add(EngineLanguage);
+            if (singer is TsnVoiceSinger tsnSinger) {
+                HashSet<string> supported = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string item in tsnSinger.Record.Languages.Split(
+                    new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)) {
+                    string trimmed = item.Trim();
+                    if (trimmed.Length > 0) {
+                        supported.Add(trimmed);
+                    }
+                }
+                string hint = TsnVoiceParameters.DetectNoteLanguage(
+                    supported, EngineLanguage, lyric);
+                if (TsnVoiceParameters.IsSupportedLanguage(hint)
+                    && !candidates.Contains(hint)) {
+                    candidates.Add(hint);
+                }
+                foreach (string item in tsnSinger.Record.Languages.Split(
+                    new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)) {
+                    string trimmed = item.Trim();
+                    if (TsnVoiceParameters.IsSupportedLanguage(trimmed)
+                        && !candidates.Contains(trimmed)) {
+                        candidates.Add(trimmed);
+                    }
+                }
+            }
+            TsnVoiceException firstError = null;
+            foreach (string language in candidates) {
+                try {
+                    return LookupIn(language, lyric);
+                } catch (TsnVoiceException e) when (
+                    e.Status == TsnVoiceStatus.InvalidArgument
+                    || e.Status == TsnVoiceStatus.Unsupported) {
+                    if (firstError == null) {
+                        firstError = e;
+                    }
+                }
+            }
+            throw firstError ?? new TsnVoiceException(TsnVoiceStatus.Unsupported,
+                "音素器不支持语言 '" + EngineLanguage + "'");
+        }
+
+        TsnVoicePronunciation LookupIn(string language, string lyric) {
             lock (dictLock) {
                 if (language == "ja_JP") {
                     if (japanese == null) {

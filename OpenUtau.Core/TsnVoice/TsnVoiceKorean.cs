@@ -97,7 +97,10 @@ namespace OpenUtau.Core.TsnVoice {
             result.palatalization = ParsePalatalizationRules("DT_PALATALIZATION_RULES",
                 Require(config, "DT_PALATALIZATION_RULES"));
             foreach (string item in Require(config, "S_PALATALIZATION_MEDIALS").Split(',')) {
-                result.sMedials.Add(item.Trim());
+                string trimmed = item.Trim();
+                if (trimmed.Length > 0) {
+                    result.sMedials.Add(trimmed);
+                }
             }
             foreach (string item in Require(config, "MACRON").Split(',')) {
                 if (item.Trim().Length > 0) {
