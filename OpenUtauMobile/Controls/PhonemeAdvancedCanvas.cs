@@ -766,6 +766,10 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
             case ExpCommand:
                 InvalidateVisual();
                 break;
+            case PartRenderedNotification rendered when rendered.part == Part:
+                // TSNVOICE 合成定时缓存落盘后重绘，叠加层即时可见。
+                InvalidateVisual();
+                break;
         }
     }
 }

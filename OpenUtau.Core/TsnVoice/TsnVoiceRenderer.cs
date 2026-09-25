@@ -280,6 +280,12 @@ namespace OpenUtau.Core.TsnVoice {
             SavePhonemeCache(phrase, phnPath, merged, originMs);
             float[] samples = TsnVoiceDsp.ResampleLinear(merged.Samples,
                 TsnVoiceParameters.NativeSampleRate, TsnVoiceParameters.MixSampleRate);
+            int expectedSamples = Math.Max(1, (int)Math.Round(
+                (contentEndMs - contentStartMs) / 1000.0 * TsnVoiceParameters.MixSampleRate));
+            Log.Information(
+                "TsnVoice 摆放自检：槽位 {Slot:F1}ms 内容 {Content:F1}ms 采样 {Samples}/{Expected} 音素 {Phones}",
+                contentStartMs, contentEndMs - contentStartMs,
+                samples.Length, expectedSamples, merged.Phonemes.Count);
             return samples;
         }
 
