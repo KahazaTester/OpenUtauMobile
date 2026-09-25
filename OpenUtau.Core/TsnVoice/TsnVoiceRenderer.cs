@@ -31,19 +31,29 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         public RenderResult Layout(RenderPhrase phrase) {
-            // 音频内容始于首个有音素音符（前后相邻的上下文音符不发声），
-            // 槽位与其对齐，与管线 preutter/偏移无关，保证混音位置精确。
+            // 音频内容始于首个有音素音符之前（保留模型静默边距，避免起音
+            // 被淡入吃掉），槽位与其对齐，与管线 preutter/偏移无关，保证混音位置精确。
             double slotStartMs = phrase.positionMs;
+            double tailMs = 0;
             if (phrase.phones.Length > 0) {
                 int firstSung = phrase.phones[0].noteIndex;
                 if (firstSung >= 0 && firstSung < phrase.notes.Length) {
                     slotStartMs = phrase.notes[firstSung].positionMs;
                 }
             }
+            if (phrase.singer is TsnVoiceSinger singer && !string.IsNullOrEmpty(singer.Location)) {
+                try {
+                    TsnVoiceLayoutMargins.Entry margins =
+                        TsnVoiceLayoutMargins.Get(singer.Location);
+                    slotStartMs -= margins.HeadMs;
+                    tailMs = margins.TailMs;
+                } catch {
+                }
+            }
             return new RenderResult() {
                 leadingMs = phrase.positionMs - slotStartMs,
                 positionMs = phrase.positionMs,
-                estimatedLengthMs = phrase.durationMs + phrase.positionMs - slotStartMs,
+                estimatedLengthMs = phrase.durationMs + phrase.positionMs - slotStartMs + tailMs,
             };
         }
 
@@ -174,6 +184,7 @@ namespace OpenUtau.Core.TsnVoice {
                 }
             }
             List<string> noteLanguages = new List<string>(sungIdx.Count);
+            bool[] autoNote = ComputeAutoEligibility(phrase);
             for (int s = 0; s < sungIdx.Count; s++) {
                 string lyric = phrase.notes[sungIdx[s]].lyric ?? string.Empty;
                 if (lyric == TsnVoiceParameters.ContinuationLyric && s > 0) {
@@ -200,10 +211,13 @@ namespace OpenUtau.Core.TsnVoice {
             int lastProgress = 0;
             progressReported = 0;
             double totalMs = Math.Max(1.0, lastMs - originMs);
+            TsnVoiceLayoutMargins.Entry margins = TsnVoiceLayoutMargins.Get(singer.Location);
             // 各 run 音频按绝对位置摆入整句 48k 缓冲（间隙补零），再整体重采样；
             // 直接拼接仅在 run 首尾相接时成立，跳过上下文音符后不再假设。
-            double contentStartMs = phrase.notes[sungIdx[0]].positionMs;
-            double contentEndMs = phrase.notes[sungIdx[sungIdx.Count - 1]].endMs;
+            // 内容含首尾静默边距（短音符不被淡入淡出吃掉），槽位已同步前移。
+            double contentStartMs = phrase.notes[sungIdx[0]].positionMs - margins.HeadMs;
+            double contentEndMs =
+                phrase.notes[sungIdx[sungIdx.Count - 1]].extendedEndMs + margins.TailMs;
             int contentSamples48 = Math.Max(1, (int)Math.Round(
                 (contentEndMs - contentStartMs) / 1000.0
                 * TsnVoiceParameters.NativeSampleRate));
@@ -217,12 +231,12 @@ namespace OpenUtau.Core.TsnVoice {
                     break;
                 }
                 double runFirstMs = phrase.notes[sungIdx[run.Item1]].positionMs;
-                double runEndMs = phrase.notes[sungIdx[run.Item2 - 1]].endMs;
+                double runEndMs = phrase.notes[sungIdx[run.Item2 - 1]].extendedEndMs;
                 List<TsnVoiceInputNote> notes = BuildRunInputs(phrase, phonesByNote,
                     noteLanguages, sungIdx, run.Item1, run.Item2, originMs);
                 List<TsnVoicePitchPoint> pitch = SamplePitch(
                     phrase, originMs, runFirstMs, runEndMs,
-                    TsnVoiceParameters.IsAutoPitchEnabled());
+                    TsnVoiceParameters.IsAutoPitchEnabled(), autoNote);
                 List<TsnVoiceControlPoint> controls = SampleControls(
                     phrase, originMs, runFirstMs, runEndMs);
                 double runBase = (runFirstMs - originMs) / totalMs;
@@ -325,7 +339,7 @@ namespace OpenUtau.Core.TsnVoice {
                 input.Id = "n" + i;
                 input.StartSeconds = Math.Max(0, (note.positionMs - originMs) / 1000.0);
                 input.EndSeconds = Math.Max(input.StartSeconds + 0.001,
-                    (note.endMs - originMs) / 1000.0);
+                    (note.extendedEndMs - originMs) / 1000.0);
                 input.MidiPitch = note.tone;
                 // 基音取含 tuning 的有效音高（与乐句音高一致），标签与校验仍用整数 tone。
                 input.BaseMidiPitch = Math.Clamp((double)note.adjustedTone, 0.0, 127.0);
@@ -338,8 +352,9 @@ namespace OpenUtau.Core.TsnVoice {
                 // 用户在延续符上写方括号注音视为固定音素覆盖，不再按延续处理。
                 bool dashPinnedOverride = isDash && group != null
                     && !(group.Count == 1 && group[0].phoneme == "-");
-                bool adjacent = s == runStart || phrase.notes[sungIdx[s - 1]].endMs + 1.0
-                    >= note.positionMs;
+                bool adjacent = s == runStart
+                    || phrase.notes[sungIdx[s - 1]].extendedEndMs + 1.0
+                        >= note.positionMs;
                 input.IsContinuation = isDash && !dashPinnedOverride
                     && s > runStart && adjacent;
                 if (input.IsContinuation) {
@@ -482,26 +497,72 @@ namespace OpenUtau.Core.TsnVoice {
             return true;
         }
 
-        static RenderNote OwnerNoteAt(RenderPhrase phrase, double ms) {
-            RenderNote owner = phrase.notes[phrase.notes.Length - 1];
-            foreach (RenderNote note in phrase.notes) {
-                if (note.positionMs <= ms) {
-                    owner = note;
+        /// <summary>
+        /// 自动音高资格（逐音符预计算）：本节新建/重置标记，且无手调音高点、
+        /// 颤音，且跨度内无 PITD 数据。烘焙与手调 PITD 均使该跨度转手动，
+        /// 模型 F0 永不覆盖既有调音；重置时由命令同步清空跨度 PITD。
+        /// </summary>
+        static bool[] ComputeAutoEligibility(RenderPhrase phrase) {
+            bool[] result = new bool[phrase.notes.Length];
+            float[] pitd = FindCurve(phrase.curves, "pitd");
+            for (int i = 0; i < result.Length; i++) {
+                RenderNote note = phrase.notes[i];
+                result[i] = note.tsnAutoPitch && !note.hasManualPitch
+                    && !SpanHasPitd(phrase, pitd, note.positionMs, note.extendedEndMs);
+            }
+            return result;
+        }
+
+        /// <summary>跨度内是否存在 PITD 数据（采样数组精确整数比对）。</summary>
+        public static bool SpanHasPitd(RenderPhrase phrase, float[] pitdCurve,
+            double startMs, double endMs) {
+            if (pitdCurve == null || pitdCurve.Length == 0) {
+                return false;
+            }
+            const int pitchInterval = 5;
+            int baseTick = phrase.position - phrase.leading;
+            int startIdx = (phrase.timeAxis.MsPosToTickPos(startMs) - baseTick)
+                / pitchInterval + 1;
+            int endIdx = (phrase.timeAxis.MsPosToTickPos(endMs) - baseTick)
+                / pitchInterval;
+            if (endIdx < 0 || startIdx >= pitdCurve.Length) {
+                return false;
+            }
+            startIdx = Math.Max(0, startIdx);
+            endIdx = Math.Min(pitdCurve.Length, endIdx + 1);
+            for (int i = startIdx; i < endIdx; i++) {
+                if (pitdCurve[i] != 0f) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static int OwnerIndexAt(RenderPhrase phrase, double ms) {
+            int owner = phrase.notes.Length - 1;
+            for (int i = 0; i < phrase.notes.Length; i++) {
+                if (phrase.notes[i].positionMs <= ms) {
+                    owner = i;
                 } else {
                     break;
                 }
             }
-            // 延续音符归属前一实质音符，与其共享发音与音高模式。
-            int index = Array.IndexOf(phrase.notes, owner);
-            while (index > 0
-                && phrase.notes[index].lyric == TsnVoiceParameters.ContinuationLyric) {
-                index--;
+            // 延续音符与 sustain 延长归属前一实质音符，与其共享发音与音高模式。
+            while (owner > 0
+                && (phrase.notes[owner].lyric == TsnVoiceParameters.ContinuationLyric
+                    || phrase.notes[owner].lyric.StartsWith("+"))) {
+                owner--;
             }
-            return phrase.notes[index];
+            return owner;
+        }
+
+        static RenderNote OwnerNoteAt(RenderPhrase phrase, double ms) {
+            return phrase.notes[OwnerIndexAt(phrase, ms)];
         }
 
         static List<TsnVoicePitchPoint> SamplePitch(RenderPhrase phrase,
-            double baseMs, double startMs, double endMs, bool autoEnabled) {
+            double baseMs, double startMs, double endMs,
+            bool autoEnabled, bool[] autoNote) {
             const int pitchInterval = 5;
             List<TsnVoicePitchPoint> result = new List<TsnVoicePitchPoint>();
             for (double ms = startMs; ms <= endMs + 0.001;
@@ -509,21 +570,22 @@ namespace OpenUtau.Core.TsnVoice {
                 int ticks = phrase.timeAxis.MsPosToTickPos(ms)
                     - (phrase.position - phrase.leading);
                 int index = Math.Clamp(ticks / pitchInterval, 0, phrase.pitches.Length - 1);
-                RenderNote owner = OwnerNoteAt(phrase, ms);
+                int ownerIndex = OwnerIndexAt(phrase, ms);
+                RenderNote owner = phrase.notes[ownerIndex];
+                bool auto = autoEnabled && autoNote[ownerIndex];
                 double midi;
-                // 总开关关闭时一律按绝对音高，不产生任何自动音高。
-                if (owner.hasManualPitch || !autoEnabled) {
-                    // 手绘音高：整体按绝对音高约束。
+                if (!auto) {
+                    // 手绘/既有音高：整体按绝对音高约束，原样保留调音。
                     midi = phrase.pitches[index] * 0.01;
                 } else {
-                    // 自动音高：含 tuning 的基音 + PITD 偏移，颤音与手绘由模型生成。
-                    midi = owner.adjustedTone + (phrase.pitches[index]
-                        - phrase.pitchesBeforeDeviation[index]) * 0.01;
+                    // 自动音高：含 tuning 的基音，颤音与表情由模型生成；
+                    // 不叠加任何既有 PITD，避免在已建立音高上重复应用。
+                    midi = owner.adjustedTone;
                 }
                 TsnVoicePitchPoint point = new TsnVoicePitchPoint();
                 point.TimeSeconds = Math.Max(0, (ms - baseMs) / 1000.0);
                 point.MidiPitch = Math.Clamp(midi, 0.0, 127.0);
-                point.IsAbsolute = owner.hasManualPitch || !autoEnabled;
+                point.IsAbsolute = !auto;
                 result.Add(point);
             }
             return result;

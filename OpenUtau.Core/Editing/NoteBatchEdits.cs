@@ -618,12 +618,21 @@ namespace OpenUtau.Core.Editing {
             });
         }
         /// <summary>
-        /// TSNVOICE 自动音符掩码：每帧按 Tick 归属到乐句音符（含延续归属），
-        /// 仅从未手调的音符保留，其余置 false 使载入跳过，保护用户调音。
+        /// TSNVOICE 自动音符掩码：每帧按 Tick 归属到乐句音符（含延续与延长归属），
+        /// 仅本节新建/重置、且无手调、无跨度 PITD 的音符参与，其余保持用户调音。
         /// </summary>
         static bool[] BuildTsnVoiceAutoMask(UVoicePart part,
             Render.RenderPhrase phrase, Render.RenderPitchResult result) {
             bool[] mask = new bool[result.tones.Length];
+            float[] pitd = null;
+            if (phrase.curves != null) {
+                foreach (var curve in phrase.curves) {
+                    if (curve.Item1 == Format.Ustx.PITD) {
+                        pitd = curve.Item2;
+                        break;
+                    }
+                }
+            }
             for (int i = 0; i < mask.Length; i++) {
                 mask[i] = false;
                 if (result.ticks == null || i >= result.ticks.Length
@@ -639,11 +648,20 @@ namespace OpenUtau.Core.Editing {
                         break;
                     }
                 }
-                while (owner > 0 && phrase.notes[owner].lyric
-                    == TsnVoice.TsnVoiceParameters.ContinuationLyric) {
+                while (owner > 0 && (phrase.notes[owner].lyric
+                    == TsnVoice.TsnVoiceParameters.ContinuationLyric
+                    || phrase.notes[owner].lyric.StartsWith("+"))) {
                     owner--;
                 }
-                mask[i] = !phrase.notes[owner].hasManualPitch;
+                Render.RenderNote note = phrase.notes[owner];
+                if (!note.tsnAutoPitch || note.hasManualPitch) {
+                    continue;
+                }
+                if (TsnVoice.TsnVoiceRenderer.SpanHasPitd(
+                    phrase, pitd, note.positionMs, note.extendedEndMs)) {
+                    continue;
+                }
+                mask[i] = true;
             }
             return mask;
         }

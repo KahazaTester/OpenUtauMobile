@@ -27,6 +27,8 @@ namespace OpenUtau.Core.Pipeline {
         public readonly int Extends;
         public readonly VibratoSource Vibrato;
         public readonly List<PitchPoint> PitchPoints;
+        /// <summary>TSNVOICE 自动音高资格（文档快照拷贝）。</summary>
+        public readonly bool TsnVoiceAutoPitch;
 
         internal NoteSource(
                 int index, UNote note, TimeAxis axis, int partPosition,
@@ -48,6 +50,7 @@ namespace OpenUtau.Core.Pipeline {
             PitchPoints = note.pitch.data
                 .Select(p => new PitchPoint(p.X, p.Y, p.shape, p.autoCompleted))
                 .ToList();
+            TsnVoiceAutoPitch = note.TsnVoiceAutoPitch;
         }
     }
 

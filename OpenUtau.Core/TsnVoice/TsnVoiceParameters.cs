@@ -22,6 +22,13 @@ namespace OpenUtau.Core.TsnVoice {
         /// <summary>音高与控制采样步长（秒），对应参考实现 5ms 采样。</summary>
         public const double PitchSampleStepSeconds = 0.005;
 
+        /// <summary>
+        /// 内容前后保留的模型上下文帧数（首静音 20 帧、尾暂停 300 帧中截取），
+        /// 使起音/释音淡入淡出落在静默区而非音乐上；短乐句不再被淡出吃光。
+        /// </summary>
+        public const int KeepHeadFrames = 8;
+        public const int KeepTailFrames = 24;
+
         /// <summary>延续音符歌词，沿用参考实现约定：不跑 G2P，直接延长前一发音。</summary>
         public const string ContinuationLyric = "-";
 

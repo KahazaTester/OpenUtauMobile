@@ -262,6 +262,8 @@ namespace OpenUtau.Core {
     public class ResetPitchPointsCommand : PitchExpCommand {
         UPitch oldPitch;
         UPitch newPitch;
+        int[] oldPitdXs;
+        int[] oldPitdYs;
         public ResetPitchPointsCommand(UVoicePart part, UNote note) : base(part) {
             Note = note;
             oldPitch = note.pitch;
@@ -271,10 +273,53 @@ namespace OpenUtau.Core {
             var shape = NotePresets.Default.DefaultPitchShape;
             newPitch.AddPoint(new PitchPoint(start, 0, shape));
             newPitch.AddPoint(new PitchPoint(start + length, 0, shape));
+            var pitd = part.curves.FirstOrDefault(c => c.abbr == Format.Ustx.PITD);
+            if (pitd != null) {
+                oldPitdXs = pitd.xs.ToArray();
+                oldPitdYs = pitd.ys.ToArray();
+            }
         }
         public override string ToString() => "Reset pitch points";
-        public override void Execute() => Note.pitch = newPitch;
-        public override void Unexecute() => Note.pitch = oldPitch;
+        public override void Execute() {
+            Note.pitch = newPitch;
+            // 重置触发 TSNVOICE 自动音高资格（与手调互斥判定配合）。
+            Note.TsnVoiceAutoPitch = true;
+            // TSNVOICE 重置同步清空该跨度 PITD，否则残留曲线阻止自动触发。
+            try {
+                var project = DocManager.Inst.Project;
+                if (project == null || Part.trackNo < 0
+                    || Part.trackNo >= project.tracks.Count
+                    || !(project.tracks[Part.trackNo].Singer is TsnVoice.TsnVoiceSinger)) {
+                    return;
+                }
+                var pitd = Part.curves.FirstOrDefault(c => c.abbr == Format.Ustx.PITD);
+                if (pitd == null || pitd.descriptor == null) {
+                    return;
+                }
+                var replaced = Ustx.UCurve.ReplaceRange(pitd.xs, pitd.ys,
+                    Note.position, Note.End,
+                    new List<(int x, int y)> { (Note.position, 0), (Note.End, 0) },
+                    pitd.descriptor);
+                pitd.xs.Clear();
+                pitd.xs.AddRange(replaced.xs);
+                pitd.ys.Clear();
+                pitd.ys.AddRange(replaced.ys);
+            } catch {
+            }
+        }
+        public override void Unexecute() {
+            Note.pitch = oldPitch;
+            try {
+                var pitd = Part.curves.FirstOrDefault(c => c.abbr == Format.Ustx.PITD);
+                if (pitd != null && oldPitdXs != null && oldPitdYs != null) {
+                    pitd.xs.Clear();
+                    pitd.xs.AddRange(oldPitdXs);
+                    pitd.ys.Clear();
+                    pitd.ys.AddRange(oldPitdYs);
+                }
+            } catch {
+            }
+        }
     }
 
     public class SetPitchPointsCommand : PitchExpCommand {

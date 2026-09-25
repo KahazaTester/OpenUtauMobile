@@ -4,7 +4,6 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.Threading;
-using OpenUtau.Core.TsnVoice;
 using OpenUtau.Core.Util;
 using OpenUtauMobile.Helpers;
 using OpenUtauMobile.Services;
@@ -57,8 +56,6 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
 
-        // TSNVOICE 新音符自动音高：仅本节新建标记，现有工程不受影响。
-        TsnVoiceAutoPitchService.Inst.Initialize();
 
         // Follow system light/dark changes with runtime-generated semantic theme.
         ActualThemeVariantChanged += (_, _) => ThemeManagerV2.OnThemeVariantChanged();

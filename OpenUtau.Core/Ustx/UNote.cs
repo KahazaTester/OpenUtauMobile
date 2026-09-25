@@ -27,6 +27,12 @@ namespace OpenUtau.Core.Ustx {
         public List<UExpression> phonemeExpressions = new List<UExpression>();
         public List<UPhonemeOverride> phonemeOverrides = new List<UPhonemeOverride>();
 
+        /// <summary>
+        /// TSNVOICE 自动音高资格（本节新建/重置时置位，手调后清除）。
+        /// 运行时标记，不存盘：重载后统一视为既有内容。
+        /// </summary>
+        [YamlIgnore] public bool TsnVoiceAutoPitch { get; set; } = false;
+
         [YamlIgnore] public int End => position + duration;
         /// <summary>
         /// The final tone, taking tuning into consideration

@@ -46,6 +46,8 @@ namespace OpenUtau.Core {
         public override void Execute() {
             lock (Part) {
                 foreach (var note in Notes) {
+                    // 新输入音符获得 TSNVOICE 自动音高资格（既有内容不受影响）。
+                    note.TsnVoiceAutoPitch = true;
                     Part.notes.Add(note);
                 }
                 if (NewPartDuration > 0) {

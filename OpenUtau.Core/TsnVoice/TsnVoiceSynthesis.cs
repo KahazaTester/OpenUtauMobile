@@ -1459,8 +1459,11 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 result.Samples[i] = (float)normalized;
             }
-            int contentSampleBegin = score.ContentStartFrame * framePeriod;
-            int contentSamples = score.ContentFrameCount * framePeriod;
+            int contentSampleBegin =
+                (score.ContentStartFrame - TsnVoiceParameters.KeepHeadFrames) * framePeriod;
+            int contentSamples = (score.ContentFrameCount
+                + TsnVoiceParameters.KeepHeadFrames
+                + TsnVoiceParameters.KeepTailFrames) * framePeriod;
             int contentSampleEnd = contentSampleBegin + contentSamples;
             if (contentSamples == 0 || contentSampleEnd > result.Samples.Length) {
                 throw new TsnVoiceException(TsnVoiceStatus.InternalError,
@@ -1478,12 +1481,19 @@ namespace OpenUtau.Core.TsnVoice {
             int fadeOutFrames = ConfigSize(voice.Config,
                 "SYNTHESIZER_FADE_OUT_FRAMES", 20);
             int releaseSamples = Math.Min(contentSamples, fadeOutFrames * framePeriod);
+            // 长内容：释音淡出锚定在音乐结尾，与参考实现一致；
+            // 短内容：淡出移到尾部边距上，避免吃掉本就短促的音乐。
+            int musicSampleEnd = contentSampleEnd
+                - TsnVoiceParameters.KeepTailFrames * framePeriod;
+            int releaseStart = score.ContentFrameCount * framePeriod >= releaseSamples
+                ? musicSampleEnd - releaseSamples
+                : contentSampleEnd - releaseSamples;
             for (int sample = 0; sample < releaseSamples; sample++) {
                 double phase = releaseSamples <= 1
                     ? 1.0
                     : (double)sample / (releaseSamples - 1);
                 float gain = (float)(0.5 * (1.0 + Math.Cos(Math.PI * phase)));
-                result.Samples[contentSampleEnd - releaseSamples + sample] *= gain;
+                result.Samples[releaseStart + sample] *= gain;
             }
             float[] contentAudio = new float[contentSamples];
             Array.Copy(result.Samples, contentSampleBegin, contentAudio, 0,

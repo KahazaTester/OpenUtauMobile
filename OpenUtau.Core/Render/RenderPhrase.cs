@@ -23,6 +23,9 @@ namespace OpenUtau.Core.Render {
         public readonly double durationMs;
         public readonly double endMs;
 
+        /// <summary>含 sustain 延长（“+”）的实际结束毫秒，仅供 TsnVoice 排布。</summary>
+        public readonly double extendedEndMs;
+
         /// <summary>
         /// 是否含用户绘制的音高：任一非零音高点（自动 portamento 首点除外），
         /// 或用户设置的颤音（默认长度为 0 即无颤音）。
@@ -33,12 +36,16 @@ namespace OpenUtau.Core.Render {
         /// </summary>
         public readonly bool hasManualPitch;
 
+        /// <summary>TSNVOICE 自动音高资格（快照）。自动生效还须无手调音高/颤音。</summary>
+        public readonly bool tsnAutoPitch;
+
         public RenderNote(Pipeline.NoteSource note, Pipeline.NoteSource prev,
             TimeAxis axis, int partPosition, int phrasePosition) {
             lyric = note.Lyric;
             tone = note.Tone;
             tuning = note.Tuning;
             adjustedTone = note.AdjustedTone;
+            tsnAutoPitch = note.TsnVoiceAutoPitch;
             // 与 UNote.Validate 的 snapFirst 规则一致：相邻前音符存在时，
             // 首点 Y 为前后有效音高差（允许微小浮点误差），不计入手绘。
             float snapY = 0;
@@ -67,6 +74,8 @@ namespace OpenUtau.Core.Render {
             positionMs = axis.TickPosToMsPos(partPosition + note.Position);
             endMs = axis.TickPosToMsPos(partPosition + note.End);
             durationMs = endMs - positionMs;
+            extendedEndMs = axis.TickPosToMsPos(
+                partPosition + note.Position + note.ExtendedDuration);
         }
     }
 
