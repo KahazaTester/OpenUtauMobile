@@ -446,15 +446,34 @@
                                   HorizontalScrollBarVisibility="Disabled">
                         <Border Padding="24,16,24,24">
                             <StackPanel Classes="DependencyPageContent">
-                                <!-- 刷新 -->
-                                <Button Classes="icon outlined"
-                                        Command="{Binding TsnVoice.RefreshCommand}"
-                                        ToolTip.Tip="{DynamicResource DependencyManager.Refresh}"
-                                        HorizontalAlignment="Right">
-                                    <iconPacks:PackIconPhosphorIcons Kind="ArrowsClockwise"
-                                        Width="{x:Static semantic:IconTokens.Standard}"
-                                        Height="{x:Static semantic:IconTokens.Standard}" />
-                                </Button>
+                                <!-- 搜索 + 刷新 -->
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{x:Static foundation:LayoutTokens.SpaceSM}">
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding TsnVoice.SearchText}"
+                                             PlaceholderText="{DynamicResource DependencyManager.Search}"
+                                             CornerRadius="{x:Static foundation:ShapeTokens.CornerL}"
+                                             VerticalContentAlignment="Center"
+                                             FontSize="{x:Static semantic:TypographyTokens.BodyMSize}" Padding="8,0,12,0">
+                                        <TextBox.InnerLeftContent>
+                                            <iconPacks:PackIconPhosphorIcons
+                                                Kind="MagnifyingGlass"
+                                                Width="{x:Static semantic:IconTokens.Compact}"
+                                                Height="{x:Static semantic:IconTokens.Compact}"
+                                                Margin="12,0,4,0"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Center"
+                                                Opacity="0.72"/>
+                                        </TextBox.InnerLeftContent>
+                                    </TextBox>
+                                    <Button Grid.Column="1"
+                                            Classes="icon outlined"
+                                            Command="{Binding TsnVoice.RefreshCommand}"
+                                            ToolTip.Tip="{DynamicResource DependencyManager.Refresh}">
+                                        <iconPacks:PackIconPhosphorIcons Kind="ArrowsClockwise"
+                                            Width="{x:Static semantic:IconTokens.Standard}"
+                                            Height="{x:Static semantic:IconTokens.Standard}" />
+                                    </Button>
+                                </Grid>
 
                                 <!-- 加载状态 -->
                                 <StackPanel IsVisible="{Binding TsnVoice.IsLoading}"

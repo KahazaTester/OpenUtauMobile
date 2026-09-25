@@ -27,14 +27,32 @@ public class TsnVoiceManagerViewModel : ReactiveObject
     [Reactive] public ObservableCollectionExtended<TsnVoiceVoiceItemViewModel> Voices { get; set; } = [];
     [Reactive] public bool IsLoading { get; set; }
     [Reactive] public string ErrorMessage { get; set; } = string.Empty;
+    [Reactive] public string SearchText { get; set; } = string.Empty;
 
     public ReactiveCommand<Unit, Unit> RefreshCommand { get; }
 
     readonly TsnVoiceVoiceInstaller installer = new TsnVoiceVoiceInstaller();
+    List<TsnVoiceVoiceItemViewModel> allVoices = new();
 
     public TsnVoiceManagerViewModel()
     {
         RefreshCommand = ReactiveCommand.CreateFromTask(LoadAsync);
+        this.WhenAnyValue(x => x.SearchText)
+            .Subscribe(_ => ApplyFilter());
+    }
+
+    void ApplyFilter()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            Voices.Load(allVoices);
+            return;
+        }
+        string query = SearchText.Trim();
+        Voices.Load(allVoices.Where(item =>
+            item.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
+            || item.Id.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
+            || item.Language.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
     }
 
     public async Task LoadAsync()
@@ -47,11 +65,13 @@ public class TsnVoiceManagerViewModel : ReactiveObject
             {
                 TsnVoiceCatalog catalog = TsnVoiceCatalog.Instance;
                 return catalog.Voices
+                    .Where(v => v.Id.IndexOf("_tts", StringComparison.OrdinalIgnoreCase) < 0)
                     .OrderBy(v => v.Name)
                     .Select(v => new TsnVoiceVoiceItemViewModel(catalog, installer, v))
                     .ToList();
             });
-            Voices.Load(items);
+            allVoices = items;
+            ApplyFilter();
             await Task.Run(() =>
             {
                 foreach (TsnVoiceVoiceItemViewModel item in items)
