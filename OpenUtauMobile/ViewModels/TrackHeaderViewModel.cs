@@ -188,14 +188,24 @@ public class TrackHeaderViewModel : ViewModelBase, IDisposable
                 .Select(d => d.Clone())
                 .ToList();
             List<UExpressionDescriptor> descriptors = project.expressions.Values.ToList();
-            // 已存在但类型/范围与建议不一致的描述（如旧工程存下的 Numerical 版
-            // ALP/HUS）会导致乐句构建过滤掉曲线，一并修正为建议值。
+            // 已存在但类型/范围/名称与建议不一致的描述（如旧工程存下的 Numerical 版
+            // ALP/HUS、旧 0..1 表情 scale 或其它语音的表情名）会导致乐句构建
+            // 过滤掉曲线或显示错乱，一并修正为建议值。
             bool repaired = false;
+            int maxEmo = 0;
             foreach (UExpressionDescriptor d in suggested)
             {
                 if (d == null)
                 {
                     continue;
+                }
+                if (OpenUtau.Core.TsnVoice.TsnVoiceParameters.IsEmotionAbbr(d.abbr))
+                {
+                    int row = OpenUtau.Core.TsnVoice.TsnVoiceParameters.EmotionRowIndex(d.abbr);
+                    if (row + 1 > maxEmo)
+                    {
+                        maxEmo = row + 1;
+                    }
                 }
                 UExpressionDescriptor existing = descriptors.Find(e => e.abbr == d.abbr);
                 if (existing == null)
@@ -203,7 +213,7 @@ public class TrackHeaderViewModel : ViewModelBase, IDisposable
                     continue;
                 }
                 if (existing.type == d.type && existing.min == d.min && existing.max == d.max
-                    && existing.defaultValue == d.defaultValue)
+                    && existing.defaultValue == d.defaultValue && existing.name == d.name)
                 {
                     continue;
                 }
@@ -212,15 +222,29 @@ public class TrackHeaderViewModel : ViewModelBase, IDisposable
                 descriptors[descriptors.IndexOf(existing)] = fixed_;
                 repaired = true;
             }
+            // 其它语音残留的超范围表情曲线（emoN，N 超过当前语音行数）对当前
+            // 语音无意义，移除以免误导；行数内的保留（数据按缩写键存取）。
+            List<UExpressionDescriptor> stale = descriptors
+                .Where(e => e != null
+                    && OpenUtau.Core.TsnVoice.TsnVoiceParameters.IsEmotionAbbr(e.abbr)
+                    && OpenUtau.Core.TsnVoice.TsnVoiceParameters.EmotionRowIndex(e.abbr) + 1 > maxEmo)
+                .ToList();
+            foreach (UExpressionDescriptor dead in stale)
+            {
+                descriptors.Remove(dead);
+            }
             descriptors.AddRange(missing);
-            if (missing.Count == 0 && !repaired)
+            if (missing.Count == 0 && !repaired && stale.Count == 0)
             {
                 return;
             }
             DocManager.Inst.ExecuteCmd(new ConfigureExpressionsCommand(project, descriptors.ToArray()));
-            Log.Information("已为 TsnVoice 轨道补齐/修正参数曲线：{Abbrs}{Repaired}",
+            Log.Information("已为 TsnVoice 轨道补齐/修正参数曲线：{Abbrs}{Repaired}{Removed}",
                 string.Join(", ", missing.Select(d => d.abbr)),
-                repaired ? "（含类型修正）" : string.Empty);
+                repaired ? "（含类型修正）" : string.Empty,
+                stale.Count > 0
+                    ? $"（移除超范围：{string.Join(", ", stale.Select(d => d.abbr))}）"
+                    : string.Empty);
         }
         catch (Exception ex)
         {

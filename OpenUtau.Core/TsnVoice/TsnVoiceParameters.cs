@@ -318,7 +318,8 @@ namespace OpenUtau.Core.TsnVoice {
                 },
             };
             for (int i = 0; i < emotionCount; i++) {
-                // 默认首表情权重 1：无绘制时等价于固定首行，与旧行为一致。
+                // 默认首表情权重满格：无绘制时等价于固定首行，与旧行为一致；
+                // 显示范围放宽到 ±1000 便于手绘，逻辑层归一化不变。
                 string label = names != null && i < names.Length
                     && names[i].Length > 0
                     ? names[i]
@@ -326,9 +327,9 @@ namespace OpenUtau.Core.TsnVoice {
                 result.Add(new UExpressionDescriptor(
                     label + " (emotion)",
                     "emo" + (i + 1),
-                    0f,
-                    1f,
-                    i == 0 ? 1f : 0f) {
+                    -1000f,
+                    1000f,
+                    i == 0 ? 1000f : 0f) {
                     type = Ustx.UExpressionType.Curve,
                 });
             }
