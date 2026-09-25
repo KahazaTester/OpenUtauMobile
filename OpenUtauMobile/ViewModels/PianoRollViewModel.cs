@@ -15,6 +15,7 @@ using DynamicData;
 using DynamicData.Binding;
 using IconPacks.Avalonia.PhosphorIcons;
 using OpenUtau.Core;
+using OpenUtau.Core.TsnVoice;
 using OpenUtau.Core.Ustx;
 using OpenUtau.Core.Util;
 using OpenUtauMobile.Audio;
@@ -700,6 +701,24 @@ public partial class PianoRollViewModel : ViewModelBase, IDisposable, ICmdSubscr
                 ? descriptor : pair.Value);
         }
 
+        // TSNVOICE 仅展示渲染器支持的表情并把 ALP/HUS 置顶，其余隐藏。
+        bool isTsnVoiceTrack = track?.Singer is TsnVoiceSinger;
+        if (isTsnVoiceTrack)
+        {
+            var renderer = track!.RendererSettings.Renderer;
+            List<UExpressionDescriptor> supported = new();
+            foreach (UExpressionDescriptor desc in list)
+            {
+                if (renderer == null || renderer.SupportsExpression(desc))
+                {
+                    supported.Add(desc);
+                }
+            }
+            int rank(UExpressionDescriptor desc) =>
+                desc.abbr == "alp" ? 0 : desc.abbr == "hus" ? 1 : 2;
+            list = supported.OrderBy(rank).ToList();
+        }
+
         foreach (UExpressionDescriptor desc in list)
         {
             string disp = string.IsNullOrWhiteSpace(desc.abbr) ? (desc.name ?? string.Empty) : desc.abbr.ToUpperInvariant();
@@ -714,6 +733,27 @@ public partial class PianoRollViewModel : ViewModelBase, IDisposable, ICmdSubscr
         }
 
         (PrimaryExpressionKey, SecondaryExpressionKey) = ExpressionSelectionState.Read(project);
+        if (isTsnVoiceTrack)
+        {
+            // 当前选择若不在支持列表则回退，避免无声参数与误报。
+            bool changed = false;
+            if (!list.Any(desc => desc.abbr == PrimaryExpressionKey))
+            {
+                PrimaryExpressionKey = list.FirstOrDefault(desc => desc.abbr == "dyn")?.abbr
+                    ?? list.FirstOrDefault()?.abbr ?? PrimaryExpressionKey;
+                changed = true;
+            }
+            if (!string.IsNullOrEmpty(SecondaryExpressionKey)
+                && !list.Any(desc => desc.abbr == SecondaryExpressionKey))
+            {
+                SecondaryExpressionKey = string.Empty;
+                changed = true;
+            }
+            if (changed)
+            {
+                ExpressionSelectionState.Store(project, PrimaryExpressionKey, SecondaryExpressionKey);
+            }
+        }
 
         this.RaisePropertyChanged(nameof(PrimaryExpressionDisplayName));
         this.RaisePropertyChanged(nameof(SecondaryExpressionDisplayName));

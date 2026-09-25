@@ -70,7 +70,7 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
     private const double DoubleClickMaxTimeMs = 350;
     private const double DoubleClickMaxDistance = 24.0;
     private const double BoundaryHitRadius = 20.0;
-    private const double ChipMargin = 5.0; // 音素卡片与边界手柄之间的水平间隙（卡片之间共留出 10px 间距）
+    private const double ChipMargin = 3.0; // 音素卡片与边界手柄之间的水平间隙（卡片之间共留出 6px 间距）
 
     public PhonemeSimpleCanvas()
     {
@@ -354,7 +354,8 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
 
         // 1. 测试是否击中边界手柄（支持滑动调整 timing offset）
         UPhoneme? hitBoundaryPhoneme = FindPhonemeBoundaryAt(pos.X);
-        if (hitBoundaryPhoneme != null && hitBoundaryPhoneme.Parent != null)
+        if (hitBoundaryPhoneme != null && hitBoundaryPhoneme.Parent != null
+            && !IsModelCovered(hitBoundaryPhoneme))
         {
             _isDraggingBoundary = true;
             _draggingPhoneme = hitBoundaryPhoneme;
@@ -498,8 +499,23 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
         return best;
     }
 
-    private UPhoneme? FindPhonemeAtTick(double partRelativeTick)
+    /// <summary>
+    /// 该管线音素是否被模型时值覆盖：覆盖区拖拽边界对手感知的非固定音符无效，
+    /// 故不启动拖拽（双击别名编辑不受影响，仍可固定为用户注音）。
+    /// </summary>
+    private bool IsModelCovered(UPhoneme phoneme)
     {
+        if (Part == null || !TsnVoiceTimingOverlay.IsTsnVoicePart(Part))
+        {
+            return false;
+        }
+        double absStart = Part.position + phoneme.position;
+        double absEnd = Part.position + phoneme.End;
+        return TsnVoiceTimingOverlay.IsCovered(
+            TsnVoiceTimingOverlay.GetPhones(Part), absStart, absEnd);
+    }
+
+    private UPhoneme? FindPhonemeAtTick(double partRelativeTick)    {
         if (Part == null)
         {
             return null;

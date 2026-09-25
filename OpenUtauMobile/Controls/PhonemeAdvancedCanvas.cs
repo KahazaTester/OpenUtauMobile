@@ -538,7 +538,8 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
 
         // 1. 测试是否击中控制手柄
         (AdvancedHandleType hitType, UPhoneme? hitPhoneme) = HitTestHandle(pos);
-        if (hitType != AdvancedHandleType.None && hitPhoneme != null)
+        if (hitType != AdvancedHandleType.None && hitPhoneme != null
+            && !IsModelCovered(hitPhoneme))
         {
             CacheResetTargetColors();
             _activeHandleType = hitType;
@@ -794,8 +795,23 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
         return (AdvancedHandleType.None, null);
     }
 
-    private UPhoneme? FindPhonemeAtTick(double partRelativeTick)
+    /// <summary>
+    /// 该管线音素是否被模型时值覆盖：覆盖区时值手柄对非固定音符无效，
+    /// 故不启动拖拽（双击别名编辑不受影响，仍可固定为用户注音）。
+    /// </summary>
+    private bool IsModelCovered(UPhoneme phoneme)
     {
+        if (Part == null || !TsnVoiceTimingOverlay.IsTsnVoicePart(Part))
+        {
+            return false;
+        }
+        double absStart = Part.position + phoneme.position;
+        double absEnd = Part.position + phoneme.End;
+        return TsnVoiceTimingOverlay.IsCovered(
+            TsnVoiceTimingOverlay.GetPhones(Part), absStart, absEnd);
+    }
+
+    private UPhoneme? FindPhonemeAtTick(double partRelativeTick)    {
         if (Part == null)
         {
             return null;
