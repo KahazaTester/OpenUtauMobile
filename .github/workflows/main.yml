@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - dev
+      - tsengine
   workflow_dispatch:
     inputs:
       version:
