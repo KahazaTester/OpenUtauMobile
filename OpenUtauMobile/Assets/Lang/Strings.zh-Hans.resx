@@ -1585,6 +1585,9 @@
   <data name="BatchEdit.LoadRenderedPitchNeedsRender" xml:space="preserve">
     <value>部分乐句尚无渲染音高，请先渲染工程后再载入渲染音高。</value>
   </data>
+  <data name="BatchEdit.LoadRenderedPitchAllManual" xml:space="preserve">
+    <value>所选音符已有手调音高，如需自动音高请先重置音高线。</value>
+  </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>歌词</value>
   </data>

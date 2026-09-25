@@ -1585,6 +1585,9 @@
   <data name="BatchEdit.LoadRenderedPitchNeedsRender" xml:space="preserve">
     <value>Some phrases have no rendered pitch yet. Render the project first, then load rendered pitch again.</value>
   </data>
+  <data name="BatchEdit.LoadRenderedPitchAllManual" xml:space="preserve">
+    <value>Selected notes already have manual pitch. Reset pitch bends to apply auto-pitch.</value>
+  </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>Lyrics</value>
   </data>

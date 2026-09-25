@@ -1582,6 +1582,9 @@
   <data name="BatchEdit.LoadRenderedPitchNeedsRender" xml:space="preserve">
     <value>レンダリング済みのピッチがないフレーズがあります。先にレンダリングしてから、もう一度お試しください。</value>
   </data>
+  <data name="BatchEdit.LoadRenderedPitchAllManual" xml:space="preserve">
+    <value>選択中のノートには手動ピッチがあります。自動ピッチを使うにはピッチをリセットしてください。</value>
+  </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>Lyrics</value>
   </data>

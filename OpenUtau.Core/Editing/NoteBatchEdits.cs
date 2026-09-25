@@ -526,10 +526,16 @@ namespace OpenUtau.Core.Editing {
                 }
                 // TODO: Optimize interpolation and command.
                 if (cancellationToken.IsCancellationRequested) break;
+                // TSNVOICE 只把自动音高写回从未手调的音符；已手调（Pitch 锚点
+                // 或颤音）的音符跳过，其 PITD 保持用户编辑。其它渲染器维持原行为。
+                System.Collections.Generic.IReadOnlyList<bool> mask = result.retakeMask;
+                if (renderer.SingerType == USingerType.TsnVoice) {
+                    mask = BuildTsnVoiceAutoMask(part, phrase, result);
+                }
                 // Take the first negative tick before start and the first tick after end for each segment;
                 // Reverse traversal, so that when the score slices are too close, priority is given to covering the consonant pitch of the next segment, reducing the impact on vowels.
                 foreach (var (start, end) in DiffSingerRetake.GetRetakeFrameRanges(
-                    result.retakeMask, result.tones.Length)) {
+                    mask, result.tones.Length)) {
                     int? lastX = null;
                     int? lastY = null;
                     for (int i = start; i < end; i++) {
@@ -573,6 +579,12 @@ namespace OpenUtau.Core.Editing {
                     "BatchEdit.LoadRenderedPitchNeedsRender"));
             }
             if (commands.Count == 0) {
+                if (recordUndo && skippedPhrases == 0
+                    && renderer.SingerType == USingerType.TsnVoice) {
+                    DocManager.Inst.ExecuteCmd(new ToastNotification("Pianoroll",
+                        "Selected notes already have manual pitch.",
+                        "BatchEdit.LoadRenderedPitchAllManual"));
+                }
                 return;
             }
             var validateOptions = new ValidateOptions {
@@ -590,6 +602,36 @@ namespace OpenUtau.Core.Editing {
                     docManager.ApplyTransient(commands, validateOptions, preRender: !fastRealtime);
                 }
             });
+        }
+        /// <summary>
+        /// TSNVOICE 自动音符掩码：每帧按 Tick 归属到乐句音符（含延续归属），
+        /// 仅从未手调的音符保留，其余置 false 使载入跳过，保护用户调音。
+        /// </summary>
+        static bool[] BuildTsnVoiceAutoMask(UVoicePart part,
+            Render.RenderPhrase phrase, Render.RenderPitchResult result) {
+            bool[] mask = new bool[result.tones.Length];
+            for (int i = 0; i < mask.Length; i++) {
+                mask[i] = false;
+                if (result.ticks == null || i >= result.ticks.Length
+                    || phrase.notes.Length == 0) {
+                    continue;
+                }
+                int x = phrase.position - part.position + (int)result.ticks[i];
+                int owner = 0;
+                for (int n = 0; n < phrase.notes.Length; n++) {
+                    if (phrase.notes[n].position <= x) {
+                        owner = n;
+                    } else {
+                        break;
+                    }
+                }
+                while (owner > 0 && phrase.notes[owner].lyric
+                    == TsnVoice.TsnVoiceParameters.ContinuationLyric) {
+                    owner--;
+                }
+                mask[i] = !phrase.notes[owner].hasManualPitch;
+            }
+            return mask;
         }
     }
 

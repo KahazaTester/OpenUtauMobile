@@ -1505,6 +1505,9 @@
   <data name="BatchEdit.LoadRenderedPitchNeedsRender" xml:space="preserve">
     <value>Для некоторых фраз нет синтезированной высоты тона. Сначала выполните рендеринг, затем повторите попытку.</value>
   </data>
+  <data name="BatchEdit.LoadRenderedPitchAllManual" xml:space="preserve">
+    <value>Выбранные ноты уже имеют ручную высоту тона. Сбросьте изгибы высоты тона, чтобы применить автопитч.</value>
+  </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>Текст</value>
   </data>
