@@ -1391,8 +1391,8 @@ namespace OpenUtau.Core.TsnVoice {
             if (reportMetadata != null) {
                 reportMetadata(BuildMetadata(score, notes, sampleRate, framePeriod));
             }
-            Dictionary<string, SessionEntry> sessions = GetSessions(voice);
             TsnVoiceVoiceHandle handle = GetVoiceHandle(voice.SourcePath);
+            Dictionary<string, SessionEntry> sessions = handle.Sessions;
             float[,] frameContext;
             float[,] linguistic;
             if (voice.LegacyContextLayout) {

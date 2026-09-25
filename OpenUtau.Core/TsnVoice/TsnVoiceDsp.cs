@@ -290,32 +290,54 @@ namespace OpenUtau.Core.TsnVoice {
             return table;
         }
 
-        static void BapFilterCepstra(double[] bap,
-            out double[] noise, out double[] pulse) {
-            double[] padded = new double[FftLength];
-            Array.Copy(bap, padded, Math.Min(bap.Length, FftLength));
-            double[] spectrum = new double[FftLength / 2 + 1];
-            for (int frequency = 0; frequency < spectrum.Length; frequency++) {
-                double real = 0;
-                for (int sample = 0; sample < FftLength; sample++) {
-                    real += padded[sample] * CosTable[frequency, sample];
+        /// <summary>
+        /// BAP 倒谱滤波暂存：逐帧复用，消除每帧 6 次数组分配；
+        /// 运算顺序与逐次分配一致，数值不变。
+        /// </summary>
+        public class BapScratch {
+            readonly double[] padded = new double[FftLength];
+            readonly double[] spectrum = new double[FftLength / 2 + 1];
+            readonly double[] noisePower = new double[FftLength / 2 + 1];
+            readonly double[] pulsePower = new double[FftLength / 2 + 1];
+            readonly double[] noise;
+            readonly double[] pulse;
+
+            public BapScratch(int bapDimensions) {
+                noise = new double[bapDimensions];
+                pulse = new double[bapDimensions];
+            }
+
+            public void Compute(double[] bap, out double[] noiseOut, out double[] pulseOut) {
+                Array.Clear(padded, 0, padded.Length);
+                Array.Copy(bap, padded, Math.Min(bap.Length, FftLength));
+                for (int frequency = 0; frequency < spectrum.Length; frequency++) {
+                    double real = 0;
+                    for (int sample = 0; sample < FftLength; sample++) {
+                        real += padded[sample] * CosTable[frequency, sample];
+                    }
+                    spectrum[frequency] = real;
                 }
-                spectrum[frequency] = real;
+                for (int index = 0; index < spectrum.Length; index++) {
+                    double noiseGain = 1.0 / (Math.Exp(spectrum[index]) + 1.0);
+                    double pulseGain = 1.0 - noiseGain;
+                    noisePower[index] = Math.Log(noiseGain * noiseGain);
+                    pulsePower[index] = Math.Log(pulseGain * pulseGain);
+                }
+                InverseCepstrumInto(noisePower, noise);
+                InverseCepstrumInto(pulsePower, pulse);
+                noiseOut = noise;
+                pulseOut = pulse;
             }
-            double[] noisePower = new double[spectrum.Length];
-            double[] pulsePower = new double[spectrum.Length];
-            for (int index = 0; index < spectrum.Length; index++) {
-                double noiseGain = 1.0 / (Math.Exp(spectrum[index]) + 1.0);
-                double pulseGain = 1.0 - noiseGain;
-                noisePower[index] = Math.Log(noiseGain * noiseGain);
-                pulsePower[index] = Math.Log(pulseGain * pulseGain);
-            }
-            noise = InverseCepstrum(noisePower, bap.Length);
-            pulse = InverseCepstrum(pulsePower, bap.Length);
         }
 
         static double[] InverseCepstrum(double[] values, int size) {
             double[] result = new double[size];
+            InverseCepstrumInto(values, result);
+            return result;
+        }
+
+        static void InverseCepstrumInto(double[] values, double[] result) {
+            int size = result.Length;
             for (int sample = 0; sample < size; sample++) {
                 double value = values[0] + values[values.Length - 1]
                     * (sample % 2 == 0 ? 1.0 : -1.0);
@@ -325,7 +347,6 @@ namespace OpenUtau.Core.TsnVoice {
                 result[sample] = value / FftLength;
             }
             result[0] *= 0.5;
-            return result;
         }
 
         /// <summary>
@@ -335,6 +356,7 @@ namespace OpenUtau.Core.TsnVoice {
             readonly int bapDimensions;
             readonly MlsaFilter noiseFilter;
             readonly MlsaFilter pulseFilter;
+            readonly BapScratch bapScratch;
             readonly GaussianRandom random = new GaussianRandom(1);
             double pitchDelta;
             double currentPitch;
@@ -350,6 +372,7 @@ namespace OpenUtau.Core.TsnVoice {
                 this.bapDimensions = bapDimensions;
                 this.noiseFilter = new MlsaFilter(bapDimensions, alpha, 4);
                 this.pulseFilter = new MlsaFilter(bapDimensions, alpha, 4);
+                this.bapScratch = new BapScratch(bapDimensions);
                 this.random = new GaussianRandom(seed);
             }
 
@@ -377,7 +400,7 @@ namespace OpenUtau.Core.TsnVoice {
                 } else {
                     pitchDelta = (pitchPeriod - currentPitch) / framePeriod;
                 }
-                BapFilterCepstra(bap, out double[] noise, out double[] pulse);
+                bapScratch.Compute(bap, out double[] noise, out double[] pulse);
                 noiseFilter.StartFrame(noise, framePeriod);
                 pulseFilter.StartFrame(pulse, framePeriod);
             }
