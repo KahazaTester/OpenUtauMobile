@@ -303,6 +303,15 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
             double chipWidth = Math.Max(2.0, chipRight - chipLeft);
 
             Rect blockRect = new Rect(chipLeft, topMargin, chipWidth, blockHeight);
+            if (span.IsLeading && chipWidth > 2.0)
+            {
+                // 前置辅音淡底：与主体元音区分。
+                using (context.PushOpacity(0.18))
+                {
+                    context.DrawRectangle(
+                        ThemeResources.GetBrush("Sem.Color.Primary"), null, blockRect, 4, 4);
+                }
+            }
             context.DrawRectangle(defaultChipFill, chipBorderPen, blockRect, 4, 4);
 
             if (!string.IsNullOrEmpty(span.Symbol) && chipWidth > 8.0)
@@ -317,6 +326,15 @@ public class PhonemeSimpleCanvas : Control, ICmdSubscriber
                         textLayout.Draw(context, new Point(0, 0));
                     }
                 }
+            }
+
+            double absBody = span.AbsBodyTick;
+            if (absBody >= span.AbsStartTick && absBody <= span.AbsEndTick)
+            {
+                // 主体起点短刻度。
+                double xb = (absBody - TickOffset) * TickWidth;
+                context.DrawLine(ThemeResources.GetPen("Sem.Color.Secondary", 2.0),
+                    new Point(xb, topMargin), new Point(xb, topMargin + Math.Min(10.0, blockHeight)));
             }
         }
     }

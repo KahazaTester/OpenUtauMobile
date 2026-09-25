@@ -398,8 +398,25 @@ public class PhonemeAdvancedCanvas : Control, ICmdSubscriber
             }
 
             double posX = (span.AbsStartTick - TickOffset) * TickWidth;
+            double posEndX = (span.AbsEndTick - TickOffset) * TickWidth;
             double lineBottom = envelopeTopY + envelopeHeight + 2.0;
+            if (span.IsLeading && posEndX > posX + 0.5)
+            {
+                using (context.PushOpacity(0.18))
+                {
+                    context.DrawRectangle(ThemeResources.GetBrush("Sem.Color.Primary"), null,
+                        new Rect(posX, envelopeTopY, posEndX - posX, envelopeHeight));
+                }
+            }
             context.DrawLine(timingPen, new Point(posX, TopMargin + 2.0), new Point(posX, lineBottom));
+
+            double absBody = span.AbsBodyTick;
+            if (absBody >= span.AbsStartTick && absBody <= span.AbsEndTick)
+            {
+                double xb = (absBody - TickOffset) * TickWidth;
+                context.DrawLine(ThemeResources.GetPen("Sem.Color.Secondary", 2.0),
+                    new Point(xb, TopMargin + 2.0), new Point(xb, TopMargin + 12.0));
+            }
 
             if (string.IsNullOrEmpty(span.Symbol))
             {

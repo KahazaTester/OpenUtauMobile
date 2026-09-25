@@ -16,6 +16,7 @@ public class TsnVoiceModelSpan {
     public double AbsEndTick;
     public string Symbol = string.Empty;
     public bool IsLeading;
+    public double AbsBodyTick;
 }
 
 public static class TsnVoiceTimingOverlay {
@@ -43,6 +44,7 @@ public static class TsnVoiceTimingOverlay {
                 span.AbsEndTick = phrase.position + phone.EndTick;
                 span.Symbol = phone.Symbol;
                 span.IsLeading = phone.IsLeading;
+                span.AbsBodyTick = phrase.position + phone.BodyTick;
                 if (span.AbsEndTick > span.AbsStartTick) {
                     result.Add(span);
                 }

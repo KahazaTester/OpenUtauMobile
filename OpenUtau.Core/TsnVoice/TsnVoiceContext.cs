@@ -49,6 +49,8 @@ namespace OpenUtau.Core.TsnVoice {
         const string IntegerSentinel = "314159265358979323846";
 
         readonly List<Question> questions = new List<Question>();
+        List<int> framePositions;
+        List<int> restPositions;
 
         static List<SpecialSpec> SpecialSpecs() {
             List<string> pitches = new List<string>();
@@ -435,6 +437,95 @@ namespace OpenUtau.Core.TsnVoice {
                     + expectedDimensions + " 维");
             }
             return result;
+        }
+
+        /// <summary>
+        /// 帧相关问题下标与其它下标划分（仅依赖问题表，与标签无关，可复用）。
+        /// </summary>
+        void EnsureSplit() {
+            if (framePositions != null) {
+                return;
+            }
+            framePositions = new List<int>();
+            restPositions = new List<int>();
+            for (int i = 0; i < questions.Count; i++) {
+                if (questions[i].Kind == Kind.Reserved
+                    && IsFrameQuestion(questions[i].Name)) {
+                    framePositions.Add(i);
+                } else {
+                    restPositions.Add(i);
+                }
+            }
+        }
+
+        public List<int> FramePositions {
+            get {
+                EnsureSplit();
+                return framePositions;
+            }
+        }
+
+        public List<int> RestPositions {
+            get {
+                EnsureSplit();
+                return restPositions;
+            }
+        }
+
+        float Evaluate(int index, string rendered, TsnVoiceLabel label,
+            TsnVoiceLabelTiming timing) {
+            Question question = questions[index];
+            double value = 0;
+            switch (question.Kind) {
+                case Kind.Reserved:
+                    value = CompileReserved(question.Name,
+                        question.Minimum, question.Maximum,
+                        question.ClipMinimum, question.ClipMaximum, timing);
+                    break;
+                case Kind.Binary: {
+                        bool matched = false;
+                        foreach (string pattern in question.Patterns) {
+                            if (TsnVoiceLabel.PatternMatch(pattern, rendered)) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                        value = matched ? 1.0 : 0.0;
+                        break;
+                    }
+                case Kind.Numeric: {
+                        string field = label.Get(question.Category, question.FieldIndex);
+                        if (field != "x" && field != "xx") {
+                            if (!TryParseLeadingDouble(field, out double number)) {
+                                throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                                    "标签数值字段不是数字");
+                            }
+                            value = Normalize(number,
+                                question.Minimum, question.Maximum,
+                                question.ClipMinimum, question.ClipMaximum);
+                        }
+                        break;
+                    }
+                case Kind.Special: {
+                        string field = label.Get(question.Category, question.FieldIndex);
+                        int found = question.SpecialValues.IndexOf(field);
+                        if (found >= 0) {
+                            value = (double)found / question.SpecialValues.Count;
+                        }
+                        break;
+                    }
+            }
+            return (float)value;
+        }
+
+        /// <summary>
+        /// 对下标子集求值，结果按传入顺序写入目标数组（调用方负责摆回原位）。
+        /// </summary>
+        public void CompileSelected(string rendered, TsnVoiceLabel label,
+            TsnVoiceLabelTiming timing, List<int> indexes, float[] destination) {
+            for (int k = 0; k < indexes.Count; k++) {
+                destination[k] = Evaluate(indexes[k], rendered, label, timing);
+            }
         }
 
         public int Dimensions => questions.Count;

@@ -882,25 +882,37 @@ namespace OpenUtau.Core.TsnVoice {
             int totalDimensions = statePhonemeDimensions + 5;
             TsnVoiceContextQuestions questions = GetContextQuestions(handle,
                 "legacy", voice.LabelFeatureRules, totalDimensions);
+            if (questions.FramePositions.Count != 5) {
+                throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                    "旧版上下文分区维度无效");
+            }
+            List<int> frameIdx = questions.FramePositions;
+            List<int> restIdx = questions.RestPositions;
             int frames = score.Duration.FrameCount;
             float[,] contexts = new float[frames, statePhonemeDimensions];
             frameContext = new float[frames, 5];
+            float[] framePart = new float[frameIdx.Count];
             foreach (TsnVoiceStateTiming timing in score.Duration.Timings) {
                 TsnVoiceLabelTiming labelTiming = new TsnVoiceLabelTiming();
                 labelTiming.StateIndex = timing.StateIndex;
                 labelTiming.StateCount = score.Duration.StateCount;
                 labelTiming.PhoneFrames = score.PhoneEnds[timing.PhonemeIndex]
                     - score.PhoneStarts[timing.PhonemeIndex];
+                labelTiming.FrameIndex = 0;
+                TsnVoiceLabel label = score.Labels[timing.PhonemeIndex];
+                string rendered = label.Render();
+                // 与状态无关的帧问题之外全部按状态求值一次，逐帧只算帧问题。
+                float[] restPart = new float[restIdx.Count];
+                questions.CompileSelected(rendered, label, labelTiming, restIdx, restPart);
+                if (restPart.Length != statePhonemeDimensions) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        "旧版上下文分区维度无效");
+                }
                 // 与原生一致逐帧编译：帧问题依赖帧在音素内的位置。
                 for (int frame = timing.StartFrame; frame < timing.EndFrame; frame++) {
                     labelTiming.FrameIndex = frame - score.PhoneStarts[timing.PhonemeIndex];
-                    questions.CompilePartitioned(score.Labels[timing.PhonemeIndex],
-                        labelTiming, out float[] framePart, out float[] restPart);
-                    if (framePart.Length != 5
-                        || restPart.Length != statePhonemeDimensions) {
-                        throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
-                            "旧版上下文分区维度无效");
-                    }
+                    questions.CompileSelected(rendered, label, labelTiming,
+                        frameIdx, framePart);
                     for (int i = 0; i < 5; i++) {
                         frameContext[frame, i] = framePart[i];
                     }
@@ -935,24 +947,36 @@ namespace OpenUtau.Core.TsnVoice {
             int commonDimensions = ModelInputDimensions(commonModel);
             TsnVoiceContextQuestions commonQuestions = GetContextQuestions(handle,
                 "common", voice.CommonQuestions, commonDimensions);
+            List<int> frameIdx = commonQuestions.FramePositions;
+            List<int> restIdx = commonQuestions.RestPositions;
             int frames = score.Duration.FrameCount;
             float[,] commonContext = new float[frames, commonDimensions];
             float[,] repeatedUnique =
                 new float[frames, uniqueEmbedding.GetLength(1)];
             frameContext = CompileFrameContext(score);
+            float[] frameVals = new float[frameIdx.Count];
             foreach (TsnVoiceStateTiming timing in score.Duration.Timings) {
                 TsnVoiceLabelTiming labelTiming = new TsnVoiceLabelTiming();
                 labelTiming.StateIndex = timing.StateIndex;
                 labelTiming.StateCount = score.Duration.StateCount;
+                labelTiming.FrameIndex = 0;
+                labelTiming.PhoneFrames = score.PhoneEnds[timing.PhonemeIndex]
+                    - score.PhoneStarts[timing.PhonemeIndex];
+                TsnVoiceLabel label = score.Labels[timing.PhonemeIndex];
+                string rendered = label.Render();
+                float[] restVals = new float[restIdx.Count];
+                commonQuestions.CompileSelected(rendered, label, labelTiming,
+                    restIdx, restVals);
                 for (int frame = timing.StartFrame; frame < timing.EndFrame; frame++) {
                     labelTiming.FrameIndex =
                         frame - score.PhoneStarts[timing.PhonemeIndex];
-                    labelTiming.PhoneFrames = score.PhoneEnds[timing.PhonemeIndex]
-                        - score.PhoneStarts[timing.PhonemeIndex];
-                    float[] compiled = commonQuestions.Compile(
-                        score.Labels[timing.PhonemeIndex], labelTiming);
-                    for (int i = 0; i < commonDimensions; i++) {
-                        commonContext[frame, i] = compiled[i];
+                    commonQuestions.CompileSelected(rendered, label, labelTiming,
+                        frameIdx, frameVals);
+                    for (int k = 0; k < restIdx.Count; k++) {
+                        commonContext[frame, restIdx[k]] = restVals[k];
+                    }
+                    for (int k = 0; k < frameIdx.Count; k++) {
+                        commonContext[frame, frameIdx[k]] = frameVals[k];
                     }
                     for (int i = 0; i < uniqueEmbedding.GetLength(1); i++) {
                         repeatedUnique[frame, i] =

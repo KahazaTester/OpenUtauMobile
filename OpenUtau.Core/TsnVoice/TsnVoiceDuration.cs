@@ -24,8 +24,11 @@ namespace OpenUtau.Core.TsnVoice {
     /// <summary>
     /// HMM 时长模型，托管移植自原生 hts_duration.cpp。
     /// 嵌入式 HTS 语音的头部与数据区同样经过 legacy 块解码。
+    /// 解析结果按语音包字节缓存：纯解析复用，数值与逐次解析一致。
     /// </summary>
     public static class TsnVoiceDuration {
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<byte[], DurationModel> modelCache =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<byte[], DurationModel>();
         class HtsQuestion {
             public List<string> Patterns = new List<string>();
         }
@@ -470,7 +473,7 @@ namespace OpenUtau.Core.TsnVoice {
             }
             List<DurationModel> models = new List<DurationModel>();
             foreach (byte[] blob in set.Blobs) {
-                models.Add(LoadDurationModel(blob));
+                models.Add(modelCache.GetValue(blob, LoadDurationModel));
             }
             int stateCount = models[0].StateCount;
             foreach (DurationModel model in models) {
