@@ -181,9 +181,17 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         public static bool StartsAt(string text, int position, string value) {
-            return position <= text.Length
-                && value.Length <= text.Length - position
-                && text.Substring(position, value.Length).Equals(value, StringComparison.Ordinal);
+            if (position > text.Length || value.Length > text.Length - position) {
+                return false;
+            }
+            // 与 Substring + Ordinal Equals 逐码元一致，零分配：
+            // 最长匹配扫描每位置遍历全表，原实现每次比较都分配子串。
+            for (int i = 0; i < value.Length; i++) {
+                if (text[position + i] != value[i]) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>

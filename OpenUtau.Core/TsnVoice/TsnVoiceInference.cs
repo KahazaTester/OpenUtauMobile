@@ -266,19 +266,6 @@ namespace OpenUtau.Core.TsnVoice {
             return 0;
         }
 
-        static bool IsCpuRunner() {
-            try {
-                string runner = Util.Preferences.Default.OnnxRunner;
-                if (string.IsNullOrEmpty(runner)) {
-                    List<string> options = Onnx.getRunnerOptions();
-                    runner = options.Count > 0 ? options[0] : "CPU";
-                }
-                return runner == "CPU";
-            } catch {
-                return false;
-            }
-        }
-
         static void AddSession(Dictionary<string, SessionEntry> sessions,
             TsnVoiceModelSet modelSet) {
             if (modelSet.Models.Count == 0) {
@@ -295,23 +282,22 @@ namespace OpenUtau.Core.TsnVoice {
             InferenceSession session;
             int intraThreads = ConfiguredThreads(modelSet);
             try {
-                // 对照原生 ort_runtime：全图优化 + 语音指定的线程数，无加速器。
-                // 仅 CPU 后端自建会话（与原生一致）；加速器选择时沿用应用统一
-                // 后端，任何失败回退统一选择器。仍是托管 1.29 同一引擎，
-                // 不新增原生库；1.18 ConvInteger 补丁在 1.29 无需移植。
-                if (intraThreads > 0 && IsCpuRunner()) {
-                    try {
-                        SessionOptions options = new SessionOptions();
-                        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+                // 与原生 ort_runtime 逐项一致，仅作用于 TSNVOICE 会话：
+                // 全图优化 + 语音指定的线程数（仅当指定），无执行提供方，
+                // 纯 CPU 推理；其它引擎的后端选择不受影响。
+                // 仍是托管 1.29 同一引擎，不新增原生库；
+                // 1.18 ConvInteger 补丁在 1.29 无需移植。
+                // 任何失败回退应用统一选择器，保证总能出声。
+                try {
+                    SessionOptions options = new SessionOptions();
+                    options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+                    if (intraThreads > 0) {
                         options.IntraOpNumThreads = intraThreads;
-                        session = new InferenceSession(modelSet.Models[0].Data, options);
-                    } catch (Exception ex) {
-                        Serilog.Log.Warning(ex,
-                            "TsnVoice {Role} 自定义会话失败，回退默认配置", modelSet.Role);
-                        session = Onnx.getInferenceSession(
-                            modelSet.Models[0].Data, OnnxRunnerChoice.Default);
                     }
-                } else {
+                    session = new InferenceSession(modelSet.Models[0].Data, options);
+                } catch (Exception ex) {
+                    Serilog.Log.Warning(ex,
+                        "TsnVoice {Role} 自定义会话失败，回退默认配置", modelSet.Role);
                     session = Onnx.getInferenceSession(
                         modelSet.Models[0].Data, OnnxRunnerChoice.Default);
                 }
