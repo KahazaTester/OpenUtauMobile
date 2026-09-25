@@ -31,10 +31,19 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         public RenderResult Layout(RenderPhrase phrase) {
+            // 音频内容始于首个有音素音符（前后相邻的上下文音符不发声），
+            // 槽位与其对齐，与管线 preutter/偏移无关，保证混音位置精确。
+            double slotStartMs = phrase.positionMs;
+            if (phrase.phones.Length > 0) {
+                int firstSung = phrase.phones[0].noteIndex;
+                if (firstSung >= 0 && firstSung < phrase.notes.Length) {
+                    slotStartMs = phrase.notes[firstSung].positionMs;
+                }
+            }
             return new RenderResult() {
-                leadingMs = phrase.leadingMs,
+                leadingMs = phrase.positionMs - slotStartMs,
                 positionMs = phrase.positionMs,
-                estimatedLengthMs = phrase.durationMs + phrase.leadingMs,
+                estimatedLengthMs = phrase.durationMs + phrase.positionMs - slotStartMs,
             };
         }
 
@@ -132,13 +141,22 @@ namespace OpenUtau.Core.TsnVoice {
                     new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
                     StringComparer.Ordinal);
             double lastMs = phrase.notes[phrase.notes.Length - 1].endMs;
-            Dictionary<int, List<RenderPhone>> phonesByNote =                new Dictionary<int, List<RenderPhone>>();
+            Dictionary<int, List<RenderPhone>> phonesByNote = new Dictionary<int, List<RenderPhone>>();
             foreach (RenderPhone phone in phrase.phones) {
                 if (!phonesByNote.TryGetValue(phone.noteIndex, out List<RenderPhone> group)) {
                     group = new List<RenderPhone>();
                     phonesByNote[phone.noteIndex] = group;
                 }
                 group.Add(phone);
+            }
+            // 仅有音素的音符才发声：乐句首尾吸入的相邻上下文音符
+            // （其音素在相邻乐句）在此跳过，否则同一音符被两个乐句重复演唱，
+            // 造成提前/交叠的随机感偏移。其它渲染器同样只按 phones 发声。
+            List<int> sungIdx = new List<int>(phrase.notes.Length);
+            for (int i = 0; i < phrase.notes.Length; i++) {
+                if (phonesByNote.ContainsKey(i)) {
+                    sungIdx.Add(i);
+                }
             }
             double originMs = ComputeOriginMs(phrase, phonesByNote);
             // Per-note language for cross-lingual singing; continuations inherit.
@@ -155,11 +173,11 @@ namespace OpenUtau.Core.TsnVoice {
                     recordLanguages.Add(trimmed);
                 }
             }
-            List<string> noteLanguages = new List<string>(phrase.notes.Length);
-            for (int i = 0; i < phrase.notes.Length; i++) {
-                string lyric = phrase.notes[i].lyric ?? string.Empty;
-                if (lyric == TsnVoiceParameters.ContinuationLyric && i > 0) {
-                    noteLanguages.Add(noteLanguages[i - 1]);
+            List<string> noteLanguages = new List<string>(sungIdx.Count);
+            for (int s = 0; s < sungIdx.Count; s++) {
+                string lyric = phrase.notes[sungIdx[s]].lyric ?? string.Empty;
+                if (lyric == TsnVoiceParameters.ContinuationLyric && s > 0) {
+                    noteLanguages.Add(noteLanguages[s - 1]);
                 } else {
                     noteLanguages.Add(ResolveNoteLanguage(recordLanguages,
                         supportedLanguages, primaryLanguage, lyric));
@@ -168,10 +186,10 @@ namespace OpenUtau.Core.TsnVoice {
             List<Tuple<int, int>> runs = new List<Tuple<int, int>>();
             {
                 int runStart = 0;
-                for (int i = 1; i <= phrase.notes.Length; i++) {
-                    if (i == phrase.notes.Length || noteLanguages[i] != noteLanguages[i - 1]) {
-                        runs.Add(Tuple.Create(runStart, i));
-                        runStart = i;
+                for (int s = 1; s <= sungIdx.Count; s++) {
+                    if (s == sungIdx.Count || noteLanguages[s] != noteLanguages[s - 1]) {
+                        runs.Add(Tuple.Create(runStart, s));
+                        runStart = s;
                     }
                 }
             }
@@ -182,17 +200,26 @@ namespace OpenUtau.Core.TsnVoice {
             int lastProgress = 0;
             progressReported = 0;
             double totalMs = Math.Max(1.0, lastMs - originMs);
-            List<float> allSamples = new List<float>();
+            // 各 run 音频按绝对位置摆入整句 48k 缓冲（间隙补零），再整体重采样；
+            // 直接拼接仅在 run 首尾相接时成立，跳过上下文音符后不再假设。
+            double contentStartMs = phrase.notes[sungIdx[0]].positionMs;
+            double contentEndMs = phrase.notes[sungIdx[sungIdx.Count - 1]].endMs;
+            int contentSamples48 = Math.Max(1, (int)Math.Round(
+                (contentEndMs - contentStartMs) / 1000.0
+                * TsnVoiceParameters.NativeSampleRate));
+            float[] mixed48 = new float[contentSamples48];
             List<TsnVoiceOutputPitch> allPitches = new List<TsnVoiceOutputPitch>();
+            List<TsnVoiceOutputPhoneme> allPhonemes = new List<TsnVoiceOutputPhoneme>();
+            int completedRuns = 0;
             for (int runIndex = 0; runIndex < runs.Count; runIndex++) {
                 Tuple<int, int> run = runs[runIndex];
                 if (cancellation.IsCancellationRequested) {
                     break;
                 }
-                double runFirstMs = phrase.notes[run.Item1].positionMs;
-                double runEndMs = phrase.notes[run.Item2 - 1].endMs;
+                double runFirstMs = phrase.notes[sungIdx[run.Item1]].positionMs;
+                double runEndMs = phrase.notes[sungIdx[run.Item2 - 1]].endMs;
                 List<TsnVoiceInputNote> notes = BuildRunInputs(phrase, phonesByNote,
-                    noteLanguages, run.Item1, run.Item2, originMs);
+                    noteLanguages, sungIdx, run.Item1, run.Item2, originMs);
                 List<TsnVoicePitchPoint> pitch = SamplePitch(
                     phrase, originMs, runFirstMs, runEndMs);
                 List<TsnVoiceControlPoint> controls = SampleControls(
@@ -215,8 +242,21 @@ namespace OpenUtau.Core.TsnVoice {
                                 + capturedCount + ")" : string.Empty));
                     },
                     null);
-                allSamples.AddRange(output.Samples);
                 allPitches.AddRange(output.Pitch);
+                allPhonemes.AddRange(output.Phonemes);
+                completedRuns++;
+                int runOffset48 = (int)Math.Round((runFirstMs - contentStartMs)
+                    / 1000.0 * TsnVoiceParameters.NativeSampleRate);
+                int runCopy = Math.Min(output.Samples.Length,
+                    Math.Max(0, contentSamples48 - runOffset48));
+                if (runOffset48 < 0) {
+                    int skip = Math.Min(-runOffset48, output.Samples.Length);
+                    runOffset48 = 0;
+                    runCopy = Math.Min(output.Samples.Length - skip, contentSamples48);
+                    Array.Copy(output.Samples, skip, mixed48, 0, runCopy);
+                } else {
+                    Array.Copy(output.Samples, 0, mixed48, runOffset48, runCopy);
+                }
                 double runSpanMs = runEndMs - runFirstMs;
                 double runAudioMs = output.Samples.Length * 1000.0
                     / TsnVoiceParameters.NativeSampleRate;
@@ -226,15 +266,16 @@ namespace OpenUtau.Core.TsnVoice {
                     runSpanMs, runAudioMs, output.Pitch.Count);
             }
             progressReported = lastProgress;
-            if (allSamples.Count == 0) {
+            if (completedRuns == 0) {
                 throw new TsnVoiceException(TsnVoiceStatus.ModelError,
                     "TsnVoice synthesis returned no audio");
             }
             TsnVoiceSynthesisOutput merged = new TsnVoiceSynthesisOutput();
             merged.SampleRate = TsnVoiceParameters.NativeSampleRate;
             merged.StartTime = 0;
-            merged.Samples = allSamples.ToArray();
+            merged.Samples = mixed48;
             merged.Pitch = allPitches;
+            merged.Phonemes = allPhonemes;
             SavePitchCache(phrase, pitchPath, merged, originMs);
             SavePhonemeCache(phrase, phnPath, merged, originMs);
             float[] samples = TsnVoiceDsp.ResampleLinear(merged.Samples,
@@ -243,13 +284,13 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         /// <summary>
-        /// 合成原点：首音符首个音素的实际起始（位置减去前置）。
-        /// 输出首采样对准该时刻，与混音槽位（positionMs - leadingMs）一致。
+        /// 合成原点：乐句内所有音素实际起始的最小值，仅用作 run 间公共时间基；
+        /// 混音槽位由 Layout 按首个发声音符对齐，与此处取值无关。
         /// </summary>
         static double ComputeOriginMs(RenderPhrase phrase,
             Dictionary<int, List<RenderPhone>> phonesByNote) {
-            double originMs = phrase.notes[0].positionMs;
-            if (phonesByNote.TryGetValue(0, out List<RenderPhone> group)) {
+            double originMs = double.PositiveInfinity;
+            foreach (List<RenderPhone> group in phonesByNote.Values) {
                 foreach (RenderPhone phone in group) {
                     double start = phone.positionMs - phone.leadingMs;
                     if (start < originMs) {
@@ -257,17 +298,21 @@ namespace OpenUtau.Core.TsnVoice {
                     }
                 }
             }
+            if (double.IsPositiveInfinity(originMs)) {
+                originMs = phrase.notes[0].positionMs;
+            }
             return originMs;
         }
 
         List<TsnVoiceInputNote> BuildRunInputs(RenderPhrase phrase,
             Dictionary<int, List<RenderPhone>> phonesByNote, List<string> noteLanguages,
-            int runStart, int runEndExclusive, double originMs) {
+            List<int> sungIdx, int runStart, int runEndExclusive, double originMs) {
             List<TsnVoiceInputNote> notes = new List<TsnVoiceInputNote>();
-            int prevTone = phrase.notes[runStart].tone;
-            for (int i = runStart; i < runEndExclusive; i++) {
+            int prevTone = phrase.notes[sungIdx[runStart]].tone;
+            for (int s = runStart; s < runEndExclusive; s++) {
+                int i = sungIdx[s];
                 RenderNote note = phrase.notes[i];
-                string language = noteLanguages[i];
+                string language = noteLanguages[s];
                 TsnVoiceInputNote input = new TsnVoiceInputNote();
                 input.Id = "n" + i;
                 input.StartSeconds = Math.Max(0, (note.positionMs - originMs) / 1000.0);
@@ -283,10 +328,10 @@ namespace OpenUtau.Core.TsnVoice {
                 // 用户在延续符上写方括号注音视为固定音素覆盖，不再按延续处理。
                 bool dashPinnedOverride = isDash && group != null
                     && !(group.Count == 1 && group[0].phoneme == "-");
-                bool adjacent = i == runStart || phrase.notes[i - 1].endMs + 1.0
+                bool adjacent = s == runStart || phrase.notes[sungIdx[s - 1]].endMs + 1.0
                     >= note.positionMs;
                 input.IsContinuation = isDash && !dashPinnedOverride
-                    && i > runStart && adjacent;
+                    && s > runStart && adjacent;
                 if (input.IsContinuation) {
                     // 延续音沿用前一实质音符的基音，保持短语内音高上下文连续。
                     input.MidiPitch = prevTone;
