@@ -221,7 +221,8 @@ namespace OpenUtau.Core.TsnVoice {
                 List<TsnVoiceInputNote> notes = BuildRunInputs(phrase, phonesByNote,
                     noteLanguages, sungIdx, run.Item1, run.Item2, originMs);
                 List<TsnVoicePitchPoint> pitch = SamplePitch(
-                    phrase, originMs, runFirstMs, runEndMs);
+                    phrase, originMs, runFirstMs, runEndMs,
+                    TsnVoiceParameters.IsAutoPitchEnabled());
                 List<TsnVoiceControlPoint> controls = SampleControls(
                     phrase, originMs, runFirstMs, runEndMs);
                 double runBase = (runFirstMs - originMs) / totalMs;
@@ -500,7 +501,7 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         static List<TsnVoicePitchPoint> SamplePitch(RenderPhrase phrase,
-            double baseMs, double startMs, double endMs) {
+            double baseMs, double startMs, double endMs, bool autoEnabled) {
             const int pitchInterval = 5;
             List<TsnVoicePitchPoint> result = new List<TsnVoicePitchPoint>();
             for (double ms = startMs; ms <= endMs + 0.001;
@@ -510,7 +511,8 @@ namespace OpenUtau.Core.TsnVoice {
                 int index = Math.Clamp(ticks / pitchInterval, 0, phrase.pitches.Length - 1);
                 RenderNote owner = OwnerNoteAt(phrase, ms);
                 double midi;
-                if (owner.hasManualPitch) {
+                // 总开关关闭时一律按绝对音高，不产生任何自动音高。
+                if (owner.hasManualPitch || !autoEnabled) {
                     // 手绘音高：整体按绝对音高约束。
                     midi = phrase.pitches[index] * 0.01;
                 } else {
@@ -521,7 +523,7 @@ namespace OpenUtau.Core.TsnVoice {
                 TsnVoicePitchPoint point = new TsnVoicePitchPoint();
                 point.TimeSeconds = Math.Max(0, (ms - baseMs) / 1000.0);
                 point.MidiPitch = Math.Clamp(midi, 0.0, 127.0);
-                point.IsAbsolute = owner.hasManualPitch;
+                point.IsAbsolute = owner.hasManualPitch || !autoEnabled;
                 result.Add(point);
             }
             return result;

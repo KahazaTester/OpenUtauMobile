@@ -336,4 +336,15 @@ namespace OpenUtau.Core {
         public override bool Silent => true; // 避免刷日志
         public override string ToString() => "Waveform rendered and ready";
     }
+
+    /// <summary>
+    /// 手动载入渲染音高完成后：参数面板可自动切到 PITD 展示烘焙结果。
+    /// </summary>
+    public class RenderPitchAppliedNotification : UNotification {
+        public override bool Silent => true;
+        public RenderPitchAppliedNotification(UPart part) {
+            this.part = part;
+        }
+        public override string ToString() => "Rendered pitch baked.";
+    }
 }

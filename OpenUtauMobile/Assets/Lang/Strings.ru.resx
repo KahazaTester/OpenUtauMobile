@@ -302,6 +302,12 @@
   <data name="Settings.Render.PreRender.Desc" xml:space="preserve">
     <value>Заранее рендерит аудио в фоне для более плавного воспроизведения</value>
   </data>
+  <data name="Settings.Render.TsnVoiceAutoPitch" xml:space="preserve">
+    <value>Автопитч TSNVOICE</value>
+  </data>
+  <data name="Settings.Render.TsnVoiceAutoPitch.Desc" xml:space="preserve">
+    <value>Автоматически создавать модельную высоту тона для новых нот. Выключите, чтобы полностью отключить автопитч</value>
+  </data>
   <data name="Settings.Render.ThreadCount" xml:space="preserve">
     <value>Количество потоков рендеринга</value>
   </data>
@@ -1507,6 +1513,9 @@
   </data>
   <data name="BatchEdit.LoadRenderedPitchAllManual" xml:space="preserve">
     <value>Выбранные ноты уже имеют ручную высоту тона. Сбросьте изгибы высоты тона, чтобы применить автопитч.</value>
+  </data>
+  <data name="BatchEdit.TsnVoiceAutoPitchDisabled" xml:space="preserve">
+    <value>Автопитч TSNVOICE выключен. Включите его в настройках.</value>
   </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>Текст</value>

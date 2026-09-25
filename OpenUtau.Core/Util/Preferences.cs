@@ -208,6 +208,11 @@ namespace OpenUtau.Core.Util {
             public bool ClearCacheOnQuit = false;
             public bool PreRender = true;
             public int NumRenderThreads = 1;
+            /// <summary>
+            /// TSNVOICE 自动音高总开关：关闭后不再产生任何自动音高
+            /// （渲染按绝对音高，服务与烘焙停用）。
+            /// </summary>
+            public bool TsnVoiceAutoPitch = true;
             public string DefaultRenderer = string.Empty;
             public int WorldlineR = 0;
             public string OnnxRunner = string.Empty;

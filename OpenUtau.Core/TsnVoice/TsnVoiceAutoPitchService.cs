@@ -29,6 +29,7 @@ namespace OpenUtau.Core.TsnVoice {
         readonly Dictionary<UVoicePart, HashSet<ulong>> bakedHashes =
             new Dictionary<UVoicePart, HashSet<ulong>>();
         readonly HashSet<UVoicePart> pitdDirty = new HashSet<UVoicePart>();
+        readonly HashSet<UVoicePart> suppressPitd = new HashSet<UVoicePart>();
         readonly Dictionary<UVoicePart, Tuple<List<int>, List<int>>> pitdBaseline =
             new Dictionary<UVoicePart, Tuple<List<int>, List<int>>>();
         readonly LoadRenderedPitch pitchLoader = new LoadRenderedPitch();
@@ -40,6 +41,9 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         public void OnNext(UCommand cmd, bool isUndo) {
+            if (!TsnVoiceParameters.IsAutoPitchEnabled()) {
+                return;
+            }
             switch (cmd) {
                 case AddNoteCommand add:
                     MarkNotes(add.Part, add.Notes);
@@ -79,30 +83,22 @@ namespace OpenUtau.Core.TsnVoice {
                     break;
                 case SetCurveCommand curve:
                     if (curve.Key == Format.Ustx.PITD && curve.Part != null) {
-                        lock (gate) {
-                            pitdDirty.Add(curve.Part);
-                        }
+                        MarkPitdDirty(curve.Part);
                     }
                     break;
                 case MergedSetCurveCommand merged:
                     if (merged.Key == Format.Ustx.PITD && merged.Part != null) {
-                        lock (gate) {
-                            pitdDirty.Add(merged.Part);
-                        }
+                        MarkPitdDirty(merged.Part);
                     }
                     break;
                 case PasteCurveCommand pasted:
                     if (pasted.Key == Format.Ustx.PITD && pasted.Part != null) {
-                        lock (gate) {
-                            pitdDirty.Add(pasted.Part);
-                        }
+                        MarkPitdDirty(pasted.Part);
                     }
                     break;
                 case ClearCurveCommand cleared:
                     if (cleared.Key == Format.Ustx.PITD && cleared.Part != null) {
-                        lock (gate) {
-                            pitdDirty.Add(cleared.Part);
-                        }
+                        MarkPitdDirty(cleared.Part);
                     }
                     break;
                 case PartRenderedNotification rendered:
@@ -156,6 +152,15 @@ namespace OpenUtau.Core.TsnVoice {
                     if (set.Count == 0) {
                         marked.Remove(part);
                     }
+                }
+            }
+        }
+
+        void MarkPitdDirty(UVoicePart part) {
+            lock (gate) {
+                // 自身烘焙写入不计入用户改动。
+                if (!suppressPitd.Contains(part)) {
+                    pitdDirty.Add(part);
                 }
             }
         }
@@ -232,6 +237,9 @@ namespace OpenUtau.Core.TsnVoice {
                 }
                 return;
             }
+            if (!TsnVoiceParameters.IsAutoPitchEnabled()) {
+                return;
+            }
             List<UNote> targets;
             lock (gate) {
                 if (!marked.TryGetValue(part, out HashSet<UNote> set) || set.Count == 0) {
@@ -305,13 +313,22 @@ namespace OpenUtau.Core.TsnVoice {
             if (fresh.Count == 0) {
                 return;
             }
+            // 自身写入期间忽略 PITD 脏标记，基线在命令落盘后刷新。
+            lock (gate) {
+                suppressPitd.Add(part);
+            }
             try {
                 pitchLoader.RunAsync(project, part, fresh, DocManager.Inst,
-                    (_, __) => { }, CancellationToken.None);
+                    (_, __) => { }, CancellationToken.None, false);
             } catch (Exception e) {
                 Log.Warning(e, "TSNVOICE 自动音高烘焙失败");
+                lock (gate) {
+                    suppressPitd.Remove(part);
+                }
                 return;
             }
+            // 仅记录实际处理的乐句哈希，未覆盖的不计入，避免漏烘。
+            HashSet<ulong> positions = new HashSet<ulong>();
             lock (gate) {
                 if (!bakedHashes.TryGetValue(part, out HashSet<ulong> done)) {
                     done = new HashSet<ulong>();
@@ -320,11 +337,28 @@ namespace OpenUtau.Core.TsnVoice {
                 if (done.Count > 400) {
                     done.Clear();
                 }
+                HashSet<int> freshPositions = new HashSet<int>();
+                foreach (UNote note in fresh) {
+                    freshPositions.Add(part.position + note.position);
+                }
                 foreach (Render.RenderPhrase phrase in part.renderPhrases) {
-                    done.Add(phrase.hash);
+                    foreach (Render.RenderNote renderNote in phrase.notes) {
+                        if (freshPositions.Contains(phrase.position + renderNote.position)) {
+                            positions.Add(phrase.hash);
+                            break;
+                        }
+                    }
+                }
+                foreach (ulong hash in positions) {
+                    done.Add(hash);
                 }
             }
-            DocManager.Inst.PostOnUIThread(() => RefreshPitdBaseline(part));
+            DocManager.Inst.PostOnUIThread(() => {
+                lock (gate) {
+                    suppressPitd.Remove(part);
+                }
+                RefreshPitdBaseline(part);
+            });
         }
 
         void ApplyPitdDiff(UVoicePart part, List<UNote> targets) {

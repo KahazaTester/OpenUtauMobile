@@ -361,6 +361,12 @@
   <data name="Settings.Render.PreRender.Desc" xml:space="preserve">
     <value>バックグラウンドで事前にオーディオをレンダリングし、再生をスムーズにします</value>
   </data>
+  <data name="Settings.Render.TsnVoiceAutoPitch" xml:space="preserve">
+    <value>TSNVOICE 自動ピッチ</value>
+  </data>
+  <data name="Settings.Render.TsnVoiceAutoPitch.Desc" xml:space="preserve">
+    <value>新規ノートにモデルピッチを自動生成します。オフにすると自動ピッチは生成されません</value>
+  </data>
   <data name="Settings.Render.ThreadCount" xml:space="preserve">
     <value>レンダースレッド数</value>
   </data>
@@ -1584,6 +1590,9 @@
   </data>
   <data name="BatchEdit.LoadRenderedPitchAllManual" xml:space="preserve">
     <value>選択中のノートには手動ピッチがあります。自動ピッチを使うにはピッチをリセットしてください。</value>
+  </data>
+  <data name="BatchEdit.TsnVoiceAutoPitchDisabled" xml:space="preserve">
+    <value>TSNVOICE 自動ピッチはオフです。設定でオンにしてからお試しください。</value>
   </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>Lyrics</value>

@@ -898,6 +898,21 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- TSNVOICE 自动音高总开关 -->
+                                <Border Classes="SettingCard">
+                                    <StackPanel Spacing="{x:Static foundation:LayoutTokens.SpaceSM}">
+                                        <StackPanel Spacing="{x:Static foundation:LayoutTokens.SpaceXS}">
+                                            <TextBlock Classes="SettingItemTitle"
+                                                       Text="{DynamicResource Settings.Render.TsnVoiceAutoPitch}" />
+                                            <TextBlock Classes="PlaceholderText"
+                                                       Text="{DynamicResource Settings.Render.TsnVoiceAutoPitch.Desc}" />
+                                        </StackPanel>
+                                        <ToggleSwitch IsChecked="{Binding TsnVoiceAutoPitchEnabled, Mode=TwoWay}"
+                                                      OffContent=""
+                                                      OnContent="" />
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- 音频输出设置 -->
                                 <Border Classes="SettingCard">
                                     <StackPanel Spacing="{x:Static foundation:LayoutTokens.SpaceM}">

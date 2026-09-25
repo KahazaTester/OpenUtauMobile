@@ -464,10 +464,12 @@ namespace OpenUtau.Core.Editing {
 
         public void RunAsync(
             UProject project, UVoicePart part, List<UNote> selectedNotes, DocManager docManager,
-            Action<int, int> setProgressCallback, CancellationToken cancellationToken) {
+            Action<int, int> setProgressCallback, CancellationToken cancellationToken,
+            bool notifySkipped = true) {
             RunInternal(
                 project, part, selectedNotes, docManager,
-                setProgressCallback, cancellationToken);
+                setProgressCallback, cancellationToken,
+                notifySkipped: notifySkipped);
         }
 
         /// <summary>Live pitch only; must not replace <see cref="RunAsync"/> (BatchEdit interface).</summary>
@@ -480,14 +482,15 @@ namespace OpenUtau.Core.Editing {
                 recordUndo: false,
                 showUnsupportedError: false,
                 pitchSteps: pitchSteps,
-                fastRealtime: fastRealtime);
+                fastRealtime: fastRealtime,
+                notifySkipped: false);
         }
 
         void RunInternal(
             UProject project, UVoicePart part, List<UNote> selectedNotes, DocManager docManager,
             Action<int, int> setProgressCallback, CancellationToken cancellationToken,
             bool recordUndo = true, bool showUnsupportedError = true, double? pitchSteps = null,
-            bool fastRealtime = false) {
+            bool fastRealtime = false, bool notifySkipped = true) {
             var renderer = project.tracks[part.trackNo].RendererSettings.Renderer;
             if (renderer == null || !renderer.SupportsRenderPitch) {
                 if (showUnsupportedError) {
@@ -496,6 +499,15 @@ namespace OpenUtau.Core.Editing {
                         $"<translate:errors.editing.autopitch.unsupported>",
                         new Exception());
                     DocManager.Inst.ExecuteCmd(new ErrorMessageNotification(e));
+                }
+                return;
+            }
+            if (renderer.SingerType == USingerType.TsnVoice
+                && !TsnVoice.TsnVoiceParameters.IsAutoPitchEnabled()) {
+                if (showUnsupportedError) {
+                    DocManager.Inst.ExecuteCmd(new ToastNotification("Pianoroll",
+                        "TSNVOICE auto-pitch is disabled.",
+                        "BatchEdit.TsnVoiceAutoPitchDisabled"));
                 }
                 return;
             }
@@ -573,7 +585,7 @@ namespace OpenUtau.Core.Editing {
                 setProgressCallback(finished, phrases.Length);
             }
 
-            if (skippedPhrases > 0 && recordUndo) {
+            if (skippedPhrases > 0 && recordUndo && notifySkipped) {
                 DocManager.Inst.ExecuteCmd(new ToastNotification("Pianoroll",
                     "Some phrases have no rendered pitch yet.",
                     "BatchEdit.LoadRenderedPitchNeedsRender"));
@@ -598,6 +610,8 @@ namespace OpenUtau.Core.Editing {
                     docManager.StartUndoGroup("command.batch.note", true);
                     commands.ForEach(docManager.ExecuteCmd);
                     docManager.EndUndoGroup();
+                    DocManager.Inst.ExecuteCmd(
+                        new RenderPitchAppliedNotification(part));
                 } else {
                     docManager.ApplyTransient(commands, validateOptions, preRender: !fastRealtime);
                 }

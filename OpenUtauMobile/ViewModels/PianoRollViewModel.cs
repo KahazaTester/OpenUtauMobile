@@ -3786,6 +3786,16 @@ public partial class PianoRollViewModel : ViewModelBase, IDisposable, ICmdSubscr
                 ValidateSelectedNotes();
                 ValidateSelectedAnchors();
                 break;
+            case RenderPitchAppliedNotification applied when applied.part == EditingVoicePart:
+                // 渲染音高已烘焙为 PITD：自动切到该曲线展示，可直接手调。
+                if (AvailableExpressions.Any(opt => opt.Key == "pitd"))
+                {
+                    PrimaryExpressionKey = "pitd";
+                    ExpressionSelectionState.Store(
+                        DocManager.Inst.Project, PrimaryExpressionKey, SecondaryExpressionKey);
+                }
+                RequestInvalidateVisual?.Invoke();
+                break;
         }
     }
 }

@@ -233,5 +233,14 @@ namespace OpenUtau.Core.TsnVoice {
         public static double ToNativeHuskiness(double huskiness) {
             return Math.Clamp(huskiness, -1.0, 1.0);
         }
+
+        /// <summary>自动音高总开关（默认开启，异常时保持开启）。</summary>
+        public static bool IsAutoPitchEnabled() {
+            try {
+                return Util.Preferences.Default.TsnVoiceAutoPitch;
+            } catch {
+                return true;
+            }
+        }
     }
 }

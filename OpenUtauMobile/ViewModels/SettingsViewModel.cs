@@ -534,6 +534,10 @@ public class SettingsViewModel : NavigateViewModelBase, IDisposable
     [Reactive]
     public bool PreRenderEnabled { get; set; }
 
+    /// <summary>是否启用 TSNVOICE 自动音高。</summary>
+    [Reactive]
+    public bool TsnVoiceAutoPitchEnabled { get; set; }
+
     /// <summary>预渲染线程数。</summary>
     [Reactive]
     public int NumRenderThreads { get; set; }
@@ -976,6 +980,7 @@ public class SettingsViewModel : NavigateViewModelBase, IDisposable
         DiffSingerStepsVariance = Preferences.Default.DiffSingerStepsVariance;
         DiffSingerStepsPitch = Preferences.Default.DiffSingerStepsPitch;
         PreRenderEnabled = Preferences.Default.PreRender;
+        TsnVoiceAutoPitchEnabled = Preferences.Default.TsnVoiceAutoPitch;
         NumRenderThreads = Preferences.Default.NumRenderThreads;
 
         this.WhenAnyValue(x => x.PerformanceMonitorEnabled)
@@ -1020,6 +1025,15 @@ public class SettingsViewModel : NavigateViewModelBase, IDisposable
             .Subscribe(value =>
             {
                 Preferences.Default.PreRender = value;
+                Preferences.Save();
+            })
+            .DisposeWith(_disposables);
+        // 监听 TSNVOICE 自动音高总开关变化
+        this.WhenAnyValue(x => x.TsnVoiceAutoPitchEnabled)
+            .Skip(1)
+            .Subscribe(value =>
+            {
+                Preferences.Default.TsnVoiceAutoPitch = value;
                 Preferences.Save();
             })
             .DisposeWith(_disposables);

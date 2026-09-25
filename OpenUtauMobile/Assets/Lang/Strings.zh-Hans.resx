@@ -361,6 +361,12 @@
   <data name="Settings.Render.PreRender.Desc" xml:space="preserve">
     <value>启用后将在后台提前渲染音频，提升播放流畅度</value>
   </data>
+  <data name="Settings.Render.TsnVoiceAutoPitch" xml:space="preserve">
+    <value>TSNVOICE 自动音高</value>
+  </data>
+  <data name="Settings.Render.TsnVoiceAutoPitch.Desc" xml:space="preserve">
+    <value>为新建音符自动生成模型音高，关闭后不再产生任何自动音高</value>
+  </data>
   <data name="Settings.Render.ThreadCount" xml:space="preserve">
     <value>渲染线程数</value>
   </data>
@@ -1587,6 +1593,9 @@
   </data>
   <data name="BatchEdit.LoadRenderedPitchAllManual" xml:space="preserve">
     <value>所选音符已有手调音高，如需自动音高请先重置音高线。</value>
+  </data>
+  <data name="BatchEdit.TsnVoiceAutoPitchDisabled" xml:space="preserve">
+    <value>TSNVOICE 自动音高已关闭，请在设置中开启后再载入渲染音高。</value>
   </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>歌词</value>
