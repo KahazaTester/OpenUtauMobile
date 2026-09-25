@@ -587,7 +587,7 @@
     <value>Remove from list</value>
   </data>
   <data name="Home.Brand.Name" xml:space="preserve">
-    <value>OpenPSUV Mobile</value>
+    <value>OpenTSNV Mobile</value>
   </data>
   <data name="Home.Recovery.Message" xml:space="preserve">
     <value>Recovered from abnormal exit: </value>
@@ -1097,7 +1097,7 @@
     <value>External libraries and contributors</value>
   </data>
   <data name="About.Contribute" xml:space="preserve">
-    <value>Help improve OpenPSUV Mobile</value>
+    <value>Help improve OpenTSNV Mobile</value>
   </data>
   <data name="About.Contribute.Desc" xml:space="preserve">
     <value>Report Bugs | Feature Requests | Contribute Code</value>
@@ -1115,7 +1115,7 @@
     <value>Failed to open link</value>
   </data>
   <data name="ErrorDialog.Title" xml:space="preserve">
-    <value>OpenPSUV Mobile Runtime Error</value>
+    <value>OpenTSNV Mobile Runtime Error</value>
   </data>
   <data name="ErrorDialog.UnknownError" xml:space="preserve">
     <value>Unknown error</value>
@@ -1520,7 +1520,7 @@
     <value>Welcome</value>
   </data>
   <data name="SetupWizard.Step0.Desc" xml:space="preserve">
-    <value>OpenPSUV Mobile is a cross-platform singing synthesis editor supporting UTAU, DiffSinger, Vogen and more. Let's take a minute for basic setup so you can start creating.</value>
+    <value>OpenTSNV Mobile is a cross-platform singing synthesis editor supporting UTAU, DiffSinger, Vogen and more. Let's take a minute for basic setup so you can start creating.</value>
   </data>
   <data name="SetupWizard.Step0.Skip" xml:space="preserve">
     <value>Skip Setup</value>
@@ -1574,13 +1574,16 @@
     <value>Setup Complete</value>
   </data>
   <data name="SetupWizard.Step3.Desc" xml:space="preserve">
-    <value>You're ready to use OpenPSUV Mobile!</value>
+    <value>You're ready to use OpenTSNV Mobile!</value>
   </data>
   <data name="SetupWizard.Finish" xml:space="preserve">
     <value>Finish</value>
   </data>
   <data name="BatchEdit.Title" xml:space="preserve">
     <value>Batch edit</value>
+  </data>
+  <data name="BatchEdit.LoadRenderedPitchNeedsRender" xml:space="preserve">
+    <value>Some phrases have no rendered pitch yet. Render the project first, then load rendered pitch again.</value>
   </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>Lyrics</value>

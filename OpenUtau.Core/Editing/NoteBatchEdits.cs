@@ -510,6 +510,7 @@ namespace OpenUtau.Core.Editing {
             int finished = 0;
             setProgressCallback(0, phrases.Length);
             var commands = new List<SetCurveCommand>();
+            int skippedPhrases = 0;
             for (int ph_i = phrases.Count() - 1; ph_i >= 0; ph_i--) {
                 var phrase = phrases[ph_i];
                 Render.RenderPitchResult result;
@@ -520,6 +521,7 @@ namespace OpenUtau.Core.Editing {
                     result = renderer.LoadRenderedPitch(phrase, positions);
                 }
                 if (result == null) {
+                    skippedPhrases++;
                     continue;
                 }
                 // TODO: Optimize interpolation and command.
@@ -565,6 +567,11 @@ namespace OpenUtau.Core.Editing {
                 setProgressCallback(finished, phrases.Length);
             }
 
+            if (skippedPhrases > 0 && recordUndo) {
+                DocManager.Inst.ExecuteCmd(new ToastNotification("Pianoroll",
+                    "Some phrases have no rendered pitch yet.",
+                    "BatchEdit.LoadRenderedPitchNeedsRender"));
+            }
             if (commands.Count == 0) {
                 return;
             }

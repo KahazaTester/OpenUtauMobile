@@ -516,7 +516,7 @@
     <value>Удалить из списка</value>
   </data>
   <data name="Home.Brand.Name" xml:space="preserve">
-    <value>OpenPSUV Mobile</value>
+    <value>OpenTSNV Mobile</value>
   </data>
   <data name="Home.Recovery.Message" xml:space="preserve">
     <value>Восстановлено после аварийного завершения: </value>
@@ -1020,7 +1020,7 @@
     <value>Сторонние библиотеки и участники</value>
   </data>
   <data name="About.Contribute" xml:space="preserve">
-    <value>Помогите сделать OpenPSUV Mobile лучше</value>
+    <value>Помогите сделать OpenTSNV Mobile лучше</value>
   </data>
   <data name="About.Contribute.Desc" xml:space="preserve">
     <value>Сообщить об ошибке | Предложить функцию | Внести вклад в код</value>
@@ -1038,7 +1038,7 @@
     <value>Не удалось открыть ссылку</value>
   </data>
   <data name="ErrorDialog.Title" xml:space="preserve">
-    <value>Ошибка выполнения OpenPSUV Mobile</value>
+    <value>Ошибка выполнения OpenTSNV Mobile</value>
   </data>
   <data name="ErrorDialog.UnknownError" xml:space="preserve">
     <value>Неизвестная ошибка</value>
@@ -1440,7 +1440,7 @@
     <value>Добро пожаловать</value>
   </data>
   <data name="SetupWizard.Step0.Desc" xml:space="preserve">
-    <value>OpenPSUV Mobile — это кроссплатформенный редактор синтеза вокала, поддерживающий UTAU, DiffSinger, Vogen и другие движки. Уделите минуту базовой настройке, чтобы начать творить.</value>
+    <value>OpenTSNV Mobile — это кроссплатформенный редактор синтеза вокала, поддерживающий UTAU, DiffSinger, Vogen и другие движки. Уделите минуту базовой настройке, чтобы начать творить.</value>
   </data>
   <data name="SetupWizard.Step0.Skip" xml:space="preserve">
     <value>Пропустить</value>
@@ -1494,13 +1494,16 @@
     <value>Настройка завершена</value>
   </data>
   <data name="SetupWizard.Step3.Desc" xml:space="preserve">
-    <value>Вы готовы использовать OpenPSUV Mobile!</value>
+    <value>Вы готовы использовать OpenTSNV Mobile!</value>
   </data>
   <data name="SetupWizard.Finish" xml:space="preserve">
     <value>Готово</value>
   </data>
   <data name="BatchEdit.Title" xml:space="preserve">
     <value>Пакетное редактирование</value>
+  </data>
+  <data name="BatchEdit.LoadRenderedPitchNeedsRender" xml:space="preserve">
+    <value>Для некоторых фраз нет синтезированной высоты тона. Сначала выполните рендеринг, затем повторите попытку.</value>
   </data>
   <data name="BatchEdit.Tab.Lyrics" xml:space="preserve">
     <value>Текст</value>

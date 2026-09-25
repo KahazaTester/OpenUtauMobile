@@ -125,7 +125,7 @@ namespace OpenUtau.Core.TsnVoice {
                 double time = note.StartSeconds + frame * frameSeconds;
                 TsnVoiceFrameControls control = new TsnVoiceFrameControls();
                 control.MidiPitch = InterpolatePitch(pitchPoints, time, note.MidiPitch);
-                control.BaseMidiPitch = note.MidiPitch;
+                control.BaseMidiPitch = note.BaseMidiPitch;
                 control.PitchIsAbsolute = InterpolateAbsolute(pitchPoints, time);
                 control.Alpha = InterpolateControl(controlPoints, time, p => p.Alpha, 0.0);
                 control.Huskiness = InterpolateControl(controlPoints, time, p => p.Huskiness, 0.0);
@@ -155,6 +155,12 @@ namespace OpenUtau.Core.TsnVoice {
                 if (note.MidiPitch < 0 || note.MidiPitch > 127) {
                     throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
                         "音符 MIDI 音高越界");
+                }
+                if (double.IsNaN(note.BaseMidiPitch)
+                    || double.IsInfinity(note.BaseMidiPitch)
+                    || note.BaseMidiPitch < 0 || note.BaseMidiPitch > 127) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
+                        "音符基准音高越界");
                 }
                 if (note.Id.Length == 0 || note.Lyric.Length == 0 || note.Language.Length == 0) {
                     throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,

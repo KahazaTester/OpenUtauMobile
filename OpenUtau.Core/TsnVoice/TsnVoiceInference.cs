@@ -16,6 +16,7 @@ namespace OpenUtau.Core.TsnVoice {
         public double StartSeconds;
         public double EndSeconds;
         public int MidiPitch = 60;
+        public double BaseMidiPitch = 60;
         public string Lyric = string.Empty;
         public string Language = "ja_JP";
         public List<TsnVoiceInputPhoneme> Phonemes = new List<TsnVoiceInputPhoneme>();

@@ -315,6 +315,7 @@ namespace OpenUtau.Core.TsnVoice {
             List<int> sungIdx, int runStart, int runEndExclusive, double originMs) {
             List<TsnVoiceInputNote> notes = new List<TsnVoiceInputNote>();
             int prevTone = phrase.notes[sungIdx[runStart]].tone;
+            double prevBase = phrase.notes[sungIdx[runStart]].adjustedTone;
             for (int s = runStart; s < runEndExclusive; s++) {
                 int i = sungIdx[s];
                 RenderNote note = phrase.notes[i];
@@ -325,6 +326,8 @@ namespace OpenUtau.Core.TsnVoice {
                 input.EndSeconds = Math.Max(input.StartSeconds + 0.001,
                     (note.endMs - originMs) / 1000.0);
                 input.MidiPitch = note.tone;
+                // 基音取含 tuning 的有效音高（与乐句音高一致），标签与校验仍用整数 tone。
+                input.BaseMidiPitch = Math.Clamp((double)note.adjustedTone, 0.0, 127.0);
                 input.Lyric = string.IsNullOrEmpty(note.lyric)
                     ? TsnVoiceParameters.DefaultLyric(language)
                     : note.lyric;
@@ -341,8 +344,10 @@ namespace OpenUtau.Core.TsnVoice {
                 if (input.IsContinuation) {
                     // 延续音沿用前一实质音符的基音，保持短语内音高上下文连续。
                     input.MidiPitch = prevTone;
+                    input.BaseMidiPitch = prevBase;
                 } else {
                     prevTone = note.tone;
+                    prevBase = input.BaseMidiPitch;
                 }
                 if (isDash && !input.IsContinuation && !dashPinnedOverride) {
                     // 句首或断开的延续符无法归属前一发音：记错并以静音占据，
@@ -509,8 +514,8 @@ namespace OpenUtau.Core.TsnVoice {
                     // 手绘音高：整体按绝对音高约束。
                     midi = phrase.pitches[index] * 0.01;
                 } else {
-                    // 自动音高：基音 + PITD 偏移，颤音与手绘由模型生成。
-                    midi = owner.tone + (phrase.pitches[index]
+                    // 自动音高：含 tuning 的基音 + PITD 偏移，颤音与手绘由模型生成。
+                    midi = owner.adjustedTone + (phrase.pitches[index]
                         - phrase.pitchesBeforeDeviation[index]) * 0.01;
                 }
                 TsnVoicePitchPoint point = new TsnVoicePitchPoint();
