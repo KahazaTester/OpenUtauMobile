@@ -17,7 +17,8 @@ namespace OpenUtau.Core.TsnVoice {
         static TsnVoiceJapaneseDictionary japanese;
         static TsnVoiceMandarinDictionary mandarinCn;
         static TsnVoiceMandarinDictionary mandarinTw;
-        static TsnVoiceEnglishDictionary english;
+        static TsnVoiceEnglishDictionary englishUs;
+        static TsnVoiceEnglishDictionary englishAu;
         static TsnVoiceKoreanDictionary korean;
 
         /// <summary>音素器负责的引擎语言。</summary>
@@ -93,10 +94,16 @@ namespace OpenUtau.Core.TsnVoice {
                     return mandarinTw.Lookup(lyric);
                 }
                 if (language == "en_US") {
-                    if (english == null) {
-                        english = TsnVoiceEnglishDictionary.Load();
+                    if (englishUs == null) {
+                        englishUs = TsnVoiceEnglishDictionary.Load("en_US");
                     }
-                    return english.Lookup(lyric);
+                    return englishUs.Lookup(lyric);
+                }
+                if (language == "en_AU") {
+                    if (englishAu == null) {
+                        englishAu = TsnVoiceEnglishDictionary.Load("en_AU");
+                    }
+                    return englishAu.Lookup(lyric);
                 }
                 if (language == "ko_KR") {
                     if (korean == null) {
@@ -193,6 +200,11 @@ namespace OpenUtau.Core.TsnVoice {
     [Phonemizer("TsnVoice English Phonemizer", "TSNVOICE EN", language: "EN")]
     public class TsnVoiceEnglishPhonemizer : TsnVoiceBasePhonemizer {
         protected override string EngineLanguage => "en_US";
+    }
+
+    [Phonemizer("TsnVoice Australian English Phonemizer", "TSNVOICE EN-AU", language: "EN")]
+    public class TsnVoiceEnglishAuPhonemizer : TsnVoiceBasePhonemizer {
+        protected override string EngineLanguage => "en_AU";
     }
 
     [Phonemizer("TsnVoice Korean Phonemizer", "TSNVOICE KO", language: "KO")]

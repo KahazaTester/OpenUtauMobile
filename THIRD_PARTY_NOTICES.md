@@ -42,5 +42,8 @@ VoiSona .tsnvoice engine reference
 - Bundled runtime data under OpenUtau.Core/TsnVoice/Dictionaries/ (G2P dictionaries),
   OpenUtau.Core/TsnVoice/Voice/catalog.json, list.json and Voice/Singer/ portraits
   are copied from the reference project's resources/ for out-of-the-box use and remain
-  subject to their respective upstream terms. Downloadable .tsnvoice packages themselves
-  are not included; users must ensure their own licensed voice data.
+  subject to their respective upstream terms. The en_AU Australian English dictionary
+  files (Dictionaries/en_AU/dict.bin, ssep.bin, tobi.bin) were staged separately and
+  bundled on explicit user instruction; their header format was verified as v1.0,
+  compatible with the existing English dictionary loader. Downloadable .tsnvoice
+  packages themselves are not included; users must ensure their own licensed voice data.

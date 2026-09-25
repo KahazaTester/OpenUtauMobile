@@ -74,7 +74,8 @@ namespace OpenUtau.Core.TsnVoice {
         static TsnVoiceJapaneseDictionary japanese;
         static readonly Dictionary<string, TsnVoiceMandarinDictionary> mandarin =
             new Dictionary<string, TsnVoiceMandarinDictionary>(StringComparer.Ordinal);
-        static TsnVoiceEnglishDictionary english;
+        static readonly Dictionary<string, TsnVoiceEnglishDictionary> english =
+            new Dictionary<string, TsnVoiceEnglishDictionary>(StringComparer.Ordinal);
         static TsnVoiceKoreanDictionary korean;
 
         public static TsnVoicePronunciation Pronounce(string language, string lyric) {
@@ -92,11 +93,12 @@ namespace OpenUtau.Core.TsnVoice {
                     }
                     return dict.Lookup(lyric);
                 }
-                if (language == "en_US") {
-                    if (english == null) {
-                        english = TsnVoiceEnglishDictionary.Load();
+                if (language == "en_US" || language == "en_AU") {
+                    if (!english.TryGetValue(language, out TsnVoiceEnglishDictionary dict)) {
+                        dict = TsnVoiceEnglishDictionary.Load(language);
+                        english[language] = dict;
                     }
-                    return english.Lookup(lyric);
+                    return dict.Lookup(lyric);
                 }
                 if (language == "ko_KR") {
                     if (korean == null) {
@@ -288,12 +290,22 @@ namespace OpenUtau.Core.TsnVoice {
                 // 纯 CPU 推理；其它引擎的后端选择不受影响。
                 // 仍是托管 1.29 同一引擎，不新增原生库；
                 // 1.18 ConvInteger 补丁在 1.29 无需移植。
+                // 初始化器设备分配子与二进制对应内存调优一致（质量无关），
+                // 设置失败时逐级回退，保证总能出声。
+                // use_ort_model_bytes_directly 刻意不用：
+                // 它要求模型字节常驻，与 ReleaseModelBytes 的移动端内存
+                // 策略冲突（≥128MB 模型 ×4 缓存有 OOM 风险），属纯内存优化。
                 // 任何失败回退应用统一选择器，保证总能出声。
                 try {
                     SessionOptions options = new SessionOptions();
                     options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
                     if (intraThreads > 0) {
                         options.IntraOpNumThreads = intraThreads;
+                    }
+                    try {
+                        options.AddSessionConfigEntry(
+                            "session.use_device_allocator_for_initializers", "1");
+                    } catch {
                     }
                     session = new InferenceSession(modelSet.Models[0].Data, options);
                 } catch (Exception ex) {
@@ -435,6 +447,101 @@ namespace OpenUtau.Core.TsnVoice {
                 return new float[dimensions];
             }
             return ConfigCode(config, dimensionsKey, codeKey);
+        }
+
+        /// <summary>
+        /// 风格码矩阵全行解析，对应 DnnVoice::Load 的 EMOTION_CODE/SPEAKER_CODE
+        /// 读取（二进制 0x1000f4730）：各分号行维度必须一致，否则报无效语音；
+        /// 缺失维度键或维度为零返回空；维度非零但缺失编码时沿用可渲染降级
+        /// （记警告后以零填充首行，与 ConfigCodeOrEmpty 一致）。
+        /// </summary>
+        public static List<float[]> ConfigCodeRows(Dictionary<string, string> config,
+            string dimensionsKey, string codeKey) {
+            List<float[]> result = new List<float[]>();
+            if (!config.TryGetValue(dimensionsKey, out string dimensionsText)
+                || dimensionsText.Length == 0) {
+                return result;
+            }
+            int dimensions = ConfigSize(config, dimensionsKey, 0, true);
+            if (dimensions == 0) {
+                return result;
+            }
+            if (!config.TryGetValue(codeKey, out string codeText)
+                || codeText.Length == 0) {
+                Serilog.Log.Warning(
+                    "语音声明 {Dimensions} 维 {Code} 但未提供编码，以零填充继续渲染",
+                    dimensions, codeKey);
+                result.Add(new float[dimensions]);
+                return result;
+            }
+            // 空行跳过（对应原生分词器忽略空记号），全空按缺失处理。
+            bool anyRow = false;
+            foreach (string row in codeText.Split(';')) {
+                string trimmedRow = row.Trim();
+                if (trimmedRow.Length == 0) {
+                    continue;
+                }
+                anyRow = true;
+                List<float> values = new List<float>();
+                foreach (string item in trimmedRow.Split(',')) {
+                    if (!float.TryParse(item, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out float value)
+                        || float.IsNaN(value) || float.IsInfinity(value)) {
+                        throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                            codeKey + " 存在非数字");
+                    }
+                    values.Add(value);
+                }
+                if (values.Count != dimensions) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        codeKey + " 维度与配置不一致");
+                }
+                result.Add(values.ToArray());
+            }
+            if (!anyRow) {
+                // 全空与缺失同等处理：记警告后零填充，保证渲染不中断
+                // （对应二进制缺失时跳过、中断延后的容忍策略）。
+                Serilog.Log.Warning(
+                    "语音声明 {Dimensions} 维 {Code} 但未提供编码，以零填充继续渲染",
+                    dimensions, codeKey);
+                result.Add(new float[dimensions]);
+                return result;
+            }
+            if (result.Count == 0) {
+                throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                    codeKey + " 为空");
+            }
+            return result;
+        }
+
+        /// <summary>语音表情矩阵行数（0 表示该语音不用表情条件）。</summary>
+        public static int EmotionRowCount(Dictionary<string, string> config) {
+            return ConfigCodeRows(config,
+                "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE").Count;
+        }
+
+        /// <summary>
+        /// 按混合权重合成表情条件向量：单行时直接返回该行（与旧行为一致，
+        /// 权重无关）；多行时按二进制全局混合语义加权。
+        /// </summary>
+        public static float[] BlendEmotionCode(List<float[]> rows, double[] weights) {
+            if (rows.Count == 0) {
+                return Array.Empty<float>();
+            }
+            if (rows.Count == 1) {
+                return rows[0];
+            }
+            double[] normalized = TsnVoiceParameters.NormalizeEmotionWeights(
+                weights ?? Array.Empty<double>(), rows.Count);
+            float[] result = new float[rows[0].Length];
+            for (int i = 0; i < rows.Count; i++) {
+                float[] row = rows[i];
+                double weight = normalized[i];
+                for (int j = 0; j < result.Length; j++) {
+                    result[j] += (float)(row[j] * weight);
+                }
+            }
+            return result;
         }
 
         // 张量分段运行，对应 run_fixed_segments / run_overlapped_segments。

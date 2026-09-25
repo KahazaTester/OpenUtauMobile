@@ -113,6 +113,9 @@ namespace OpenUtau.Core.TsnVoice {
                 if (primary == "en_US") {
                     return typeof(TsnVoiceEnglishPhonemizer).FullName ?? string.Empty;
                 }
+                if (primary == "en_AU") {
+                    return typeof(TsnVoiceEnglishAuPhonemizer).FullName ?? string.Empty;
+                }
                 if (primary == "ko_KR") {
                     return typeof(TsnVoiceKoreanPhonemizer).FullName ?? string.Empty;
                 }

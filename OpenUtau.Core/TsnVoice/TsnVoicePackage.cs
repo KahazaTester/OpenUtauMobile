@@ -198,7 +198,9 @@ namespace OpenUtau.Core.TsnVoice {
             while (start <= text.Length) {
                 int comma = text.IndexOf(',', start);
                 int end = comma < 0 ? text.Length : comma;
-                string value = text.Substring(start, end - start).Trim();
+                // 语音声明的语言写法按二进制别名表统一为规范标识。
+                string value = TsnVoiceParameters.CanonicalLanguage(
+                    text.Substring(start, end - start));
                 if (value.Length > 0) {
                     result.Add(value);
                 }
@@ -223,11 +225,33 @@ namespace OpenUtau.Core.TsnVoice {
 
         static List<string> InferLanguages(string path) {
             string stem = Path.GetFileNameWithoutExtension(path);
-            List<string> result = new List<string>();
+            // 各语言取最长命中的别名（如 en_AU 优先于 en 的短别名）；
+            // 最高长度出现并列时沿用旧行为：无法确定唯一语言则报错。
+            string best = null;
+            int bestLength = -1;
+            bool tied = false;
             foreach (string language in TsnVoiceParameters.Languages) {
-                if (stem.IndexOf("_" + language + "_", StringComparison.OrdinalIgnoreCase) >= 0) {
-                    result.Add(language);
+                int matched = -1;
+                foreach (string alias in TsnVoiceParameters.LanguageAliasForms(language)) {
+                    if (stem.IndexOf("_" + alias + "_", StringComparison.OrdinalIgnoreCase) >= 0
+                        && alias.Length > matched) {
+                        matched = alias.Length;
+                    }
                 }
+                if (matched < 0) {
+                    continue;
+                }
+                if (matched > bestLength) {
+                    best = language;
+                    bestLength = matched;
+                    tied = false;
+                } else if (matched == bestLength && best != language) {
+                    tied = true;
+                }
+            }
+            List<string> result = new List<string>();
+            if (best != null && !tied) {
+                result.Add(best);
             }
             if (result.Count != 1) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,

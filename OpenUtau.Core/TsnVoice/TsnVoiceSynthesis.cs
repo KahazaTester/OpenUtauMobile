@@ -1001,7 +1001,7 @@ namespace OpenUtau.Core.TsnVoice {
 
         static void RunAcousticModels(TsnVoicePackage voice,
             Dictionary<string, SessionEntry> sessions, PreparedScore score,
-            float[,] linguistic, float[,] frameContext,
+            float[,] linguistic, float[,] frameContext, double[] emotionWeights,
             Action<double> stage1Fraction, Action<double> stage2Fraction,
             out float[,] stage1, out float[,] stage2) {
             int frames = score.Duration.FrameCount;
@@ -1010,8 +1010,12 @@ namespace OpenUtau.Core.TsnVoice {
                 lf0Context[frame, 0] =
                     (float)TsnVoiceDsp.ScoreLf0(score.Controls[frame].MidiPitch);
             }
-            float[,] emotion = RepeatedCode(frames, ConfigCodeOrEmpty(voice.Config,
-                "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE"));
+            // 表情条件：全行解析后按全局混合权重合成；单行/缺省时退化为
+            // 首行（与旧行为一致，权重无关）。说话人条件沿用首行。
+            List<float[]> emotionRows = ConfigCodeRows(voice.Config,
+                "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE");
+            float[,] emotion = RepeatedCode(frames,
+                BlendEmotionCode(emotionRows, emotionWeights));
             float[,] speaker = RepeatedCode(frames, ConfigCodeOrEmpty(voice.Config,
                 "SPEAKER_CONTEXT_DIMENSIONS", "SPEAKER_CODE"));
             float[,] stage1Input = ConcatenateColumns(new List<float[,]> {
@@ -1371,12 +1375,15 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>
         /// 完整合成：时序→语言→声学→激励→声码→裁剪。
+        /// emotionWeights 为全局表情混合权重（可空，缺省首行），
+        /// 对应二进制全局混合语义，整句恒定。
         /// </summary>
         public static TsnVoiceSynthesisOutput Synthesize(
             TsnVoicePackage voice, List<TsnVoiceInputNote> notes,
             List<TsnVoicePitchPoint> pitchPoints, List<TsnVoiceControlPoint> controlPoints,
             Func<bool> isCancelled, Action<float, string> reportProgress,
-            Action<TsnVoiceSynthesisOutput> reportMetadata) {
+            Action<TsnVoiceSynthesisOutput> reportMetadata,
+            double[] emotionWeights = null) {
             if (notes.Count > 100000 || pitchPoints.Count > 10000000
                 || controlPoints.Count > 10000000) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
@@ -1415,6 +1422,7 @@ namespace OpenUtau.Core.TsnVoice {
                 throw new TsnVoiceException(TsnVoiceStatus.Cancelled, "合成已取消");
             }
             RunAcousticModels(voice, sessions, score, linguistic, frameContext,
+                emotionWeights,
                 f => reportProgress(0.34f + (float)(0.15 * f), "acoustic"),
                 f => reportProgress(0.49f + (float)(0.15 * f), "acoustic"),
                 out float[,] stage1, out float[,] stage2);

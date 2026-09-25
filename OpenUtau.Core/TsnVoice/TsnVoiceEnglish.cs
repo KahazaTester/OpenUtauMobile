@@ -159,13 +159,27 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         public static TsnVoiceEnglishDictionary Load() {
+            return Load("en_US");
+        }
+
+        /// <summary>
+        /// 英语词典加载，en_US/en_AU 共用同一 v1.0 容器格式，
+        /// 按语言目录读取（DataPath 覆盖优先，否则内嵌资源）；
+        /// 缺失时报明确错误，不静默混用。
+        /// </summary>
+        public static TsnVoiceEnglishDictionary Load(string language) {
+            if (language != "en_US" && language != "en_AU") {
+                throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
+                    "英语词典不支持语言 '" + language + "'");
+            }
             foreach (string name in new string[] { "dict.bin", "ssep.bin", "tobi.bin" }) {
-                if (!TsnVoiceDictionaries.DictionaryFileExists("en_US", name)) {
+                if (!TsnVoiceDictionaries.DictionaryFileExists(language, name)) {
                     throw new TsnVoiceException(TsnVoiceStatus.IoError,
-                        "缺少英语词典文件 " + name);
+                        "缺少英语词典文件 " + language + "/" + name
+                        + "（DataPath/Dictionaries/TsnVoice/" + language + "/ 或内嵌资源）");
                 }
             }
-            byte[] payload = TsnVoiceDictionaries.GetDictionaryBytes("en_US", "dict.bin");
+            byte[] payload = TsnVoiceDictionaries.GetDictionaryBytes(language, "dict.bin");
             if ((ulong)payload.Length > MaxDictionaryBytes) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice, "英语词典过大");
             }

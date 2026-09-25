@@ -715,7 +715,8 @@ public partial class PianoRollViewModel : ViewModelBase, IDisposable, ICmdSubscr
                 }
             }
             int rank(UExpressionDescriptor desc) =>
-                desc.abbr == "alp" ? 0 : desc.abbr == "hus" ? 1 : 2;
+                desc.abbr == "alp" ? 0 : desc.abbr == "hus" ? 1
+                : TsnVoiceParameters.IsEmotionAbbr(desc.abbr) ? 2 : 3;
             list = supported.OrderBy(rank).ToList();
         }
 

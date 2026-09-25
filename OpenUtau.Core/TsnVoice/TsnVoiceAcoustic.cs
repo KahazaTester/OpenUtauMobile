@@ -63,7 +63,7 @@ namespace OpenUtau.Core.TsnVoice {
             }
             List<int> dimensions = new List<int>();
             foreach (string item in dimensionsEntry.Split(',')) {
-                if (!int.TryParse(item, out int dimension) || dimension == 0) {
+                if (!int.TryParse(item, out int dimension) || dimension <= 0) {
                     throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
                         "语音声学维度无效");
                 }
@@ -79,12 +79,33 @@ namespace OpenUtau.Core.TsnVoice {
             for (int i = 0; i < names.Length; i++) {
                 byName[names[i]] = dimensions[i];
             }
-            if (!byName.ContainsKey("MGC") || !byName.ContainsKey("BAP")
-                || !byName.ContainsKey("LAT")) {
+            // 分流拼接与二进制一致（CreateMgcStructure/CreateBapStructure，
+            // MGC0/MGC1、BAP0/BAP1 优先于整体 MGC/BAP）：
+            // 声学 DNN 输出按拼接后的 MGC/BAP/LAT 排布，其余流（LF0/VIB 等）
+            // 由各自管线消费，此处不参与。
+            int mgc;
+            if (byName.ContainsKey("MGC0") && byName.ContainsKey("MGC1")) {
+                mgc = byName["MGC0"] + byName["MGC1"];
+            } else if (byName.ContainsKey("MGC")) {
+                mgc = byName["MGC"];
+            } else {
+                throw new TsnVoiceException(TsnVoiceStatus.Unsupported,
+                    "推理需要 MGC（或 MGC0+MGC1）声学特征；该语音声明为 " + namesEntry);
+            }
+            int bap;
+            if (byName.ContainsKey("BAP0") && byName.ContainsKey("BAP1")) {
+                bap = byName["BAP0"] + byName["BAP1"];
+            } else if (byName.ContainsKey("BAP")) {
+                bap = byName["BAP"];
+            } else {
+                throw new TsnVoiceException(TsnVoiceStatus.Unsupported,
+                    "推理需要 BAP（或 BAP0+BAP1）声学特征；该语音声明为 " + namesEntry);
+            }
+            if (!byName.ContainsKey("LAT")) {
                 throw new TsnVoiceException(TsnVoiceStatus.Unsupported,
                     "推理需要 MGC,BAP,LAT 声学特征；该语音声明为 " + namesEntry);
             }
-            return new int[] { byName["MGC"], byName["BAP"], byName["LAT"] };
+            return new int[] { mgc, bap, byName["LAT"] };
         }
 
         static double[] MajorityFilter(double[] source, int filterSize) {

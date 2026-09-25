@@ -181,7 +181,7 @@ namespace OpenUtau.Core.TsnVoice {
                 if (flag.Length == 0) {
                     flag = "0";
                 }
-            } else if (language == "en_US") {
+            } else if (language == "en_US" || language == "en_AU") {
                 languageName = "ENG";
                 if (flag.Length == 0) {
                     flag = "00";

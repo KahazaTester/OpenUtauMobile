@@ -54,12 +54,83 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>引擎支持的语言标识。</summary>
         public static readonly string[] Languages = new string[] {
-            "ja_JP", "zh_CN", "zh_TW", "en_US", "ko_KR",
+            "ja_JP", "zh_CN", "zh_TW", "en_US", "en_AU", "ko_KR",
         };
+
+        /// <summary>
+        /// 二进制语言别名表，对应 ConvertFromLanguageStr 接受的全部写法：
+        /// 语音配置与文件名中的变体统一为规范标识；
+        /// 未知写法保持原样，交由后续校验报明确错误。
+        /// </summary>
+        static readonly KeyValuePair<string, string>[] LanguageAliases =
+            new KeyValuePair<string, string>[] {
+                new KeyValuePair<string, string>("ja-JP", "ja_JP"),
+                new KeyValuePair<string, string>("ja-jp", "ja_JP"),
+                new KeyValuePair<string, string>("ja_JP", "ja_JP"),
+                new KeyValuePair<string, string>("ja_jp", "ja_JP"),
+                new KeyValuePair<string, string>("ja", "ja_JP"),
+                new KeyValuePair<string, string>("en-US", "en_US"),
+                new KeyValuePair<string, string>("en-us", "en_US"),
+                new KeyValuePair<string, string>("en_US", "en_US"),
+                new KeyValuePair<string, string>("en_us", "en_US"),
+                new KeyValuePair<string, string>("en", "en_US"),
+                new KeyValuePair<string, string>("en-AU", "en_AU"),
+                new KeyValuePair<string, string>("en-au", "en_AU"),
+                new KeyValuePair<string, string>("en_AU", "en_AU"),
+                new KeyValuePair<string, string>("en_au", "en_AU"),
+                new KeyValuePair<string, string>("zh-CN", "zh_CN"),
+                new KeyValuePair<string, string>("zh-cn", "zh_CN"),
+                new KeyValuePair<string, string>("zh_CN", "zh_CN"),
+                new KeyValuePair<string, string>("zh_cn", "zh_CN"),
+                new KeyValuePair<string, string>("zh-TW", "zh_TW"),
+                new KeyValuePair<string, string>("zh-tw", "zh_TW"),
+                new KeyValuePair<string, string>("zh_TW", "zh_TW"),
+                new KeyValuePair<string, string>("zh_tw", "zh_TW"),
+                new KeyValuePair<string, string>("ko-KR", "ko_KR"),
+                new KeyValuePair<string, string>("ko-kr", "ko_KR"),
+                new KeyValuePair<string, string>("ko_KR", "ko_KR"),
+                new KeyValuePair<string, string>("ko_kr", "ko_KR"),
+                new KeyValuePair<string, string>("ko", "ko_KR"),
+                new KeyValuePair<string, string>("fr-FR", "fr_FR"),
+                new KeyValuePair<string, string>("fr-fr", "fr_FR"),
+                new KeyValuePair<string, string>("fr_FR", "fr_FR"),
+                new KeyValuePair<string, string>("fr_fr", "fr_FR"),
+                new KeyValuePair<string, string>("fr", "fr_FR"),
+            };
+
+        /// <summary>将语言别名统一为规范标识，未知写法保持原样。</summary>
+        public static string CanonicalLanguage(string language) {
+            if (string.IsNullOrEmpty(language)) {
+                return language;
+            }
+            string trimmed = language.Trim();
+            foreach (KeyValuePair<string, string> pair in LanguageAliases) {
+                if (string.Equals(pair.Key, trimmed, StringComparison.OrdinalIgnoreCase)) {
+                    return pair.Value;
+                }
+            }
+            return trimmed;
+        }
+
+        /// <summary>规范语言的全部文件名匹配形式（规范写法优先，短别名随后）。</summary>
+        public static string[] LanguageAliasForms(string canonical) {
+            List<string> forms = new List<string>();
+            forms.Add(canonical);
+            foreach (KeyValuePair<string, string> pair in LanguageAliases) {
+                if (pair.Value == canonical && pair.Key != canonical
+                    && !forms.Contains(pair.Key)) {
+                    forms.Add(pair.Key);
+                }
+            }
+            return forms.ToArray();
+        }
 
         public const string DefaultLanguage = "ja_JP";
 
-        /// <summary>各语言无歌词时的默认音节，与参考实现保持一致。</summary>
+        /// <summary>
+        /// 各语言无歌词时的默认音节，与参考实现保持一致；
+        /// en_AU 与 en_US 同属英语，共用 love（参考实现无 en_AU 分支）。
+        /// </summary>
         public static string DefaultLyric(string language) {
             switch (language) {
                 case "ja_JP":
@@ -68,6 +139,7 @@ namespace OpenUtau.Core.TsnVoice {
                 case "zh_TW":
                     return "la";
                 case "en_US":
+                case "en_AU":
                     return "love";
                 case "ko_KR":
                     return "가";
@@ -195,7 +267,8 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         /// <summary>
-        /// 渲染器支持的表情缩写：力度、音高偏移与 ALP/HUS 自定义曲线。
+        /// 渲染器支持的表情缩写：力度、音高偏移与 ALP/HUS 自定义曲线，
+        /// 外加 EMO1..EMON 表情混合曲线（行数随语音，见 IsEmotionAbbr）。
         /// 原生声学条件仅接受 alpha/huskiness，其余标准曲线无对应输入，
         /// 为避免误导不予支持。
         /// </summary>
@@ -209,9 +282,18 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>ALP/HUS 自定义曲线描述，供渲染器 GetSuggestedExpressions 返回。</summary>
         public static UExpressionDescriptor[] BuildSuggestedExpressions() {
+            return BuildSuggestedExpressions(0);
+        }
+
+        /// <summary>
+        /// 含表情混合的曲线描述：ALP/HUS 之后追加 EMO1..EMON。
+        /// 表情索引与语音 EMOTION_CODE 矩阵行对应（行数见推理层），
+        /// 名称在语音侧无定义（桌面端名称来自工程 XML），此处按序号命名。
+        /// </summary>
+        public static UExpressionDescriptor[] BuildSuggestedExpressions(int emotionCount) {
             // 注意：此构造不设 type，须显式标为 Curve，否则乐句构建按
             // Numerical 过滤掉，曲线永远到不了渲染器。
-            return new UExpressionDescriptor[] {
+            List<UExpressionDescriptor> result = new List<UExpressionDescriptor>() {
                 new UExpressionDescriptor(
                     "ALP (alpha)",
                     "alp",
@@ -229,6 +311,78 @@ namespace OpenUtau.Core.TsnVoice {
                     type = Ustx.UExpressionType.Curve,
                 },
             };
+            for (int i = 0; i < emotionCount; i++) {
+                // 默认首表情权重 1：无绘制时等价于固定首行，与旧行为一致。
+                result.Add(new UExpressionDescriptor(
+                    "EMO" + (i + 1) + " (emotion)",
+                    "emo" + (i + 1),
+                    0f,
+                    1f,
+                    i == 0 ? 1f : 0f) {
+                    type = Ustx.UExpressionType.Curve,
+                });
+            }
+            return result.ToArray();
+        }
+
+        /// <summary>是否为表情混合曲线缩写（emo1..emoN）。</summary>
+        public static bool IsEmotionAbbr(string abbr) {
+            if (string.IsNullOrEmpty(abbr) || abbr.Length < 4) {
+                return false;
+            }
+            if (!abbr.StartsWith("emo", StringComparison.Ordinal)) {
+                return false;
+            }
+            for (int i = 3; i < abbr.Length; i++) {
+                if (abbr[i] < '0' || abbr[i] > '9') {
+                    return false;
+                }
+            }
+            return abbr.Length > 3 && int.TryParse(abbr.Substring(3),
+                out int index) && index >= 1;
+        }
+
+        /// <summary>表情缩写对应的矩阵行号（0 起），非法返回 -1。</summary>
+        public static int EmotionRowIndex(string abbr) {
+            if (!IsEmotionAbbr(abbr)
+                || !int.TryParse(abbr.Substring(3), out int index)) {
+                return -1;
+            }
+            return index - 1;
+        }
+
+        /// <summary>
+        /// 表情混合权重归一，对应 GlobalInterpolationRatio::SetGlobalRatio
+        /// （二进制 0x1001249e0）：短于行数补零；负数钳零（总和按钳制前计算）；
+        /// 总和为零时取均匀 1/N；否则除以总和。
+        /// 非有限输入按零处理，避免毒化整句。
+        /// </summary>
+        public static double[] NormalizeEmotionWeights(double[] raw, int count) {
+            double[] result = new double[Math.Max(0, count)];
+            if (result.Length == 0) {
+                return result;
+            }
+            double sum = 0;
+            for (int i = 0; i < result.Length; i++) {
+                double value = i < raw.Length ? raw[i] : 0.0;
+                if (double.IsNaN(value) || double.IsInfinity(value)) {
+                    value = 0.0;
+                }
+                sum += value;
+                result[i] = value < 0.0 ? 0.0 : value;
+            }
+            if (sum == 0.0) {
+                for (int i = 0; i < result.Length; i++) {
+                    result[i] = 1.0 / result.Length;
+                }
+                return result;
+            }
+            if (sum != 1.0) {
+                for (int i = 0; i < result.Length; i++) {
+                    result[i] /= sum;
+                }
+            }
+            return result;
         }
 
         /// <summary>用户绘制的 ALP 值换算为原生 alpha（-1..1）。</summary>

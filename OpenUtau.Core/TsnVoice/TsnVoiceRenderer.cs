@@ -27,7 +27,8 @@ namespace OpenUtau.Core.TsnVoice {
 
         public bool SupportsExpression(UExpressionDescriptor descriptor) {
             return descriptor != null
-                && TsnVoiceParameters.SupportedExpressions.Contains(descriptor.abbr);
+                && (TsnVoiceParameters.SupportedExpressions.Contains(descriptor.abbr)
+                    || TsnVoiceParameters.IsEmotionAbbr(descriptor.abbr));
         }
 
         public RenderResult Layout(RenderPhrase phrase) {
@@ -239,6 +240,8 @@ namespace OpenUtau.Core.TsnVoice {
                     TsnVoiceParameters.IsAutoPitchEnabled(), autoNote);
                 List<TsnVoiceControlPoint> controls = SampleControls(
                     phrase, originMs, runFirstMs, runEndMs);
+                double[] emotionWeights = SampleEmotionWeights(
+                    package, phrase, runFirstMs);
                 double runBase = (runFirstMs - originMs) / totalMs;
                 double runSpan = Math.Max(0.0, runEndMs - runFirstMs) / totalMs;
                 int capturedIndex = runIndex;
@@ -256,7 +259,8 @@ namespace OpenUtau.Core.TsnVoice {
                             + (capturedCount > 1 ? " (" + (capturedIndex + 1) + "/"
                                 + capturedCount + ")" : string.Empty));
                     },
-                    null);
+                    null,
+                    emotionWeights);
                 allPitches.AddRange(output.Pitch);
                 allPhonemes.AddRange(output.Phonemes);
                 completedRuns++;
@@ -600,6 +604,41 @@ namespace OpenUtau.Core.TsnVoice {
             return null;
         }
 
+        /// <summary>
+        /// 表情混合权重采样：二进制全局混合语义为整句恒定，
+        /// 此处取 run 起始处的绘制值；无 EMO 曲线时返回首行权重。
+        /// </summary>
+        static double[] SampleEmotionWeights(TsnVoicePackage package,
+            RenderPhrase phrase, double startMs) {
+            int count;
+            try {
+                count = TsnVoiceInference.EmotionRowCount(package.Config);
+            } catch (Exception e) {
+                Log.Warning(e, "读取 TsnVoice 表情行数失败，使用缺省权重");
+                return null;
+            }
+            if (count <= 1) {
+                return null;
+            }
+            double[] raw = new double[count];
+            raw[0] = 1.0;
+            if (phrase.curves == null) {
+                return raw;
+            }
+            int ticks = phrase.timeAxis.MsPosToTickPos(startMs)
+                - (phrase.position - phrase.leading);
+            int index = ticks / 5;
+            for (int i = 0; i < count; i++) {
+                float[] curve = FindCurve(phrase.curves, "emo" + (i + 1));
+                if (curve != null && curve.Length > 0) {
+                    raw[i] = curve[Math.Clamp(index, 0, curve.Length - 1)];
+                } else if (i > 0) {
+                    raw[i] = 0.0;
+                }
+            }
+            return raw;
+        }
+
         static List<TsnVoiceControlPoint> SampleControls(RenderPhrase phrase,
             double baseMs, double startMs, double endMs) {
             const int pitchInterval = 5;
@@ -808,6 +847,21 @@ namespace OpenUtau.Core.TsnVoice {
 
         public UExpressionDescriptor[] GetSuggestedExpressions(USinger singer,
             URenderSettings renderSettings) {
+            // 表情行数随语音：多表情语音追加 EMO1..N；
+            // 解析失败时仅返回 ALP/HUS，不阻塞。
+            if (singer is TsnVoiceSinger tsnSinger
+                && !string.IsNullOrEmpty(tsnSinger.Location)) {
+                try {
+                    TsnVoicePackage package =
+                        TsnVoicePackage.Load(tsnSinger.Location);
+                    int count = TsnVoiceInference.EmotionRowCount(package.Config);
+                    if (count > 1) {
+                        return TsnVoiceParameters.BuildSuggestedExpressions(count);
+                    }
+                } catch (Exception e) {
+                    Log.Warning(e, "读取 TsnVoice 表情行数失败，仅建议 ALP/HUS");
+                }
+            }
             return TsnVoiceParameters.BuildSuggestedExpressions();
         }
 
