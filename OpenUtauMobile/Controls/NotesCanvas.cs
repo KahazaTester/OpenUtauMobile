@@ -8,6 +8,7 @@ using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using OpenUtau.Core;
 using OpenUtau.Core.Render;
+using OpenUtau.Core.TsnVoice;
 using OpenUtau.Core.Ustx;
 using OpenUtau.Core.Util;
 using OpenUtauMobile.Themes.OpenUtauMobile.Runtime;
@@ -392,6 +393,80 @@ public class NotesCanvas : Control, ICmdSubscriber
     }
 
     /// <summary>
+    /// 当前分片是否使用 TSNVOICE 歌手。
+    /// </summary>
+    private bool IsTsnVoicePart()
+    {
+        if (Part == null) return false;
+        try
+        {
+            var project = DocManager.Inst.Project;
+            if (project == null || Part.trackNo < 0 || Part.trackNo >= project.tracks.Count)
+            {
+                return false;
+            }
+            return project.tracks[Part.trackNo].Singer is TsnVoiceSinger;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 绘制 TSNVOICE 渲染音高缓存（乐句相对 Tick 转绝对，半音转键位）。
+    /// 有缓存且视口内不少于两点返回 true，否则返回 false 由调用方绘制输入音高。
+    /// </summary>
+    private bool RenderCachedTsnVoicePitch(RenderPhrase phrase,
+        int leftTick, int rightTick, StreamGeometryContext geometryContext)
+    {
+        RenderPitchResult cached;
+        try
+        {
+            cached = Renderers.GetOrCreate(Renderers.TSNVOICE).LoadRenderedPitch(phrase);
+        }
+        catch
+        {
+            return false;
+        }
+        if (cached == null || cached.ticks == null || cached.tones == null
+            || cached.ticks.Length != cached.tones.Length || cached.ticks.Length < 2)
+        {
+            return false;
+        }
+        int first = -1;
+        int last = -1;
+        for (int i = 0; i < cached.ticks.Length; i++)
+        {
+            int tick = phrase.position + (int)cached.ticks[i];
+            if (tick < leftTick || tick > rightTick)
+            {
+                continue;
+            }
+            if (first < 0)
+            {
+                first = i;
+            }
+            last = i;
+        }
+        if (first < 0 || last <= first)
+        {
+            return false;
+        }
+        Point firstPoint = ViewModel.TickPitchToPoint(
+            phrase.position + (int)cached.ticks[first], cached.tones[first] - 0.5);
+        geometryContext.BeginFigure(firstPoint, false);
+        for (int i = first + 1; i <= last; i++)
+        {
+            Point point = ViewModel.TickPitchToPoint(
+                phrase.position + (int)cached.ticks[i], cached.tones[i] - 0.5);
+            geometryContext.LineTo(point);
+        }
+        geometryContext.EndFigure(false);
+        return true;
+    }
+
+    /// <summary>
     /// 绘制最终音高曲线
     /// </summary>
     /// <param name="leftTick"></param>
@@ -405,6 +480,7 @@ public class NotesCanvas : Control, ICmdSubscriber
         IPen pen = ViewModel.EditMode == PianoRollEditMode.PitchPen ? ThemeResources.GetPen("Sem.Color.Primary", 2) : ThemeResources.GetPen("Sem.Color.Outline");
         StreamGeometry geometry = new();
         bool hasVisibleSegment = false;
+        bool isTsnVoice = IsTsnVoicePart();
         lock (Part)
         {
             using (StreamGeometryContext geometryContext = geometry.Open())
@@ -413,6 +489,15 @@ public class NotesCanvas : Control, ICmdSubscriber
                 {
                     if (phrase.position > rightTick || phrase.end < leftTick)
                     {
+                        continue;
+                    }
+
+                    // TSNVOICE 显示渲染产物音高（模型自动音高/手绘约束结果），
+                    // 新音符与改动后重渲染即自动更新；无缓存回退输入音高。
+                    if (isTsnVoice && RenderCachedTsnVoicePitch(
+                        phrase, leftTick, rightTick, geometryContext))
+                    {
+                        hasVisibleSegment = true;
                         continue;
                     }
 
@@ -943,6 +1028,10 @@ public class NotesCanvas : Control, ICmdSubscriber
             case SetCurveCommand:
             case PhonemizedNotification:
             case PitchExpCommand: // 音高控制点增删改时刷新画布
+                InvalidateVisual();
+                break;
+            case PartRenderedNotification rendered when rendered.part == Part:
+                // TSNVOICE 渲染音高缓存落盘后重绘，自动音高即时可见。
                 InvalidateVisual();
                 break;
         }
