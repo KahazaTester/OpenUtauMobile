@@ -187,15 +187,40 @@ public class TrackHeaderViewModel : ViewModelBase, IDisposable
                 .Where(d => d != null && !project.expressions.ContainsKey(d.abbr))
                 .Select(d => d.Clone())
                 .ToList();
-            if (missing.Count == 0)
+            List<UExpressionDescriptor> descriptors = project.expressions.Values.ToList();
+            // 已存在但类型/范围与建议不一致的描述（如旧工程存下的 Numerical 版
+            // ALP/HUS）会导致乐句构建过滤掉曲线，一并修正为建议值。
+            bool repaired = false;
+            foreach (UExpressionDescriptor d in suggested)
+            {
+                if (d == null)
+                {
+                    continue;
+                }
+                UExpressionDescriptor existing = descriptors.Find(e => e.abbr == d.abbr);
+                if (existing == null)
+                {
+                    continue;
+                }
+                if (existing.type == d.type && existing.min == d.min && existing.max == d.max
+                    && existing.defaultValue == d.defaultValue)
+                {
+                    continue;
+                }
+                UExpressionDescriptor fixed_ = d.Clone();
+                fixed_.CustomDefaultValue = existing.CustomDefaultValue;
+                descriptors[descriptors.IndexOf(existing)] = fixed_;
+                repaired = true;
+            }
+            descriptors.AddRange(missing);
+            if (missing.Count == 0 && !repaired)
             {
                 return;
             }
-            List<UExpressionDescriptor> descriptors = project.expressions.Values.ToList();
-            descriptors.AddRange(missing);
             DocManager.Inst.ExecuteCmd(new ConfigureExpressionsCommand(project, descriptors.ToArray()));
-            Log.Information("已为 TsnVoice 轨道补齐参数曲线：{Abbrs}",
-                string.Join(", ", missing.Select(d => d.abbr)));
+            Log.Information("已为 TsnVoice 轨道补齐/修正参数曲线：{Abbrs}{Repaired}",
+                string.Join(", ", missing.Select(d => d.abbr)),
+                repaired ? "（含类型修正）" : string.Empty);
         }
         catch (Exception ex)
         {

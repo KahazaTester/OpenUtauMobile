@@ -413,14 +413,26 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         /// <summary>
-        /// 风格码宽松读取：缺失维度键或维度为零时返回空（该语音不用此条件），
-        /// 组装后的 CNN 输入维度校验仍会拦截真正不兼容的语音。
+        /// 风格码宽松读取：缺失维度键或维度为零时返回空（该语音不用此条件）；
+        /// 维度非零但缺失编码时以零填充并记警告（参考实现直接报错中断，
+        /// 此处为可渲染降级），组装后的 CNN 输入维度校验仍会拦截真正不兼容的语音。
         /// </summary>
         static float[] ConfigCodeOrEmpty(Dictionary<string, string> config,
             string dimensionsKey, string codeKey) {
             if (!config.TryGetValue(dimensionsKey, out string dimensionsText)
                 || dimensionsText.Length == 0) {
                 return Array.Empty<float>();
+            }
+            int dimensions = ConfigSize(config, dimensionsKey, 0, true);
+            if (dimensions == 0) {
+                return Array.Empty<float>();
+            }
+            if (!config.TryGetValue(codeKey, out string codeText)
+                || codeText.Length == 0) {
+                Serilog.Log.Warning(
+                    "语音声明 {Dimensions} 维 {Code} 但未提供编码，以零填充继续渲染",
+                    dimensions, codeKey);
+                return new float[dimensions];
             }
             return ConfigCode(config, dimensionsKey, codeKey);
         }
