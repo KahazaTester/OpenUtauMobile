@@ -1005,22 +1005,23 @@ namespace OpenUtau.Core.TsnVoice {
         /// 归一规则见二进制全局混合语义。
         /// </summary>
         static float[,] BuildEmotionMatrix(TsnVoicePackage voice, PreparedScore score,
-            List<TsnVoiceInputNote> notes, List<double[]> weightsPerNote) {
+            List<TsnVoiceInputNote> notes, List<double[]> weightsPerNote,
+            List<float[]> emotionRows, double[] defaultWeights) {
             int frames = score.Duration.FrameCount;
-            List<float[]> rows = ConfigCodeRows(voice.Config,
-                "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE");
-            if (rows.Count <= 1) {
+            if (emotionRows.Count <= 1) {
                 return RepeatedCode(frames,
-                    rows.Count == 0 ? Array.Empty<float>() : rows[0]);
+                    emotionRows.Count == 0 ? Array.Empty<float>() : emotionRows[0]);
             }
             List<double[]> normalized = new List<double[]>(notes.Count);
             for (int n = 0; n < notes.Count; n++) {
-                double[] raw = weightsPerNote != null && n < weightsPerNote.Count
-                    && weightsPerNote[n] != null
-                    ? weightsPerNote[n]
-                    : new double[] { 1.0 };
-                normalized.Add(TsnVoiceParameters.NormalizeEmotionWeights(
-                    raw, rows.Count));
+                // 用户绘制按二进制归一；缺省用语音默认混合（原样，不归一）。
+                if (weightsPerNote != null && n < weightsPerNote.Count
+                    && weightsPerNote[n] != null) {
+                    normalized.Add(TsnVoiceParameters.NormalizeEmotionWeights(
+                        weightsPerNote[n], emotionRows.Count));
+                } else {
+                    normalized.Add(defaultWeights);
+                }
             }
             Dictionary<string, int> noteIndexById =
                 new Dictionary<string, int>(StringComparer.Ordinal);
@@ -1048,11 +1049,11 @@ namespace OpenUtau.Core.TsnVoice {
             }
             double[][] frameWeights = TsnVoiceParameters.InterpolateNoteWeights(
                 normalized, noteStartFrames, frames);
-            float[,] result = new float[frames, rows[0].Length];
+            float[,] result = new float[frames, emotionRows[0].Length];
             for (int frame = 0; frame < frames; frame++) {
                 double[] weights = frameWeights[frame];
-                for (int i = 0; i < rows.Count; i++) {
-                    float[] row = rows[i];
+                for (int i = 0; i < emotionRows.Count; i++) {
+                    float[] row = emotionRows[i];
                     double weight = weights[i];
                     for (int j = 0; j < result.GetLength(1); j++) {
                         result[frame, j] += (float)(row[j] * weight);
@@ -1065,6 +1066,7 @@ namespace OpenUtau.Core.TsnVoice {
         static void RunAcousticModels(TsnVoicePackage voice,
             Dictionary<string, SessionEntry> sessions, PreparedScore score,
             float[,] linguistic, float[,] frameContext, float[,] emotion,
+            string language,
             Action<double> stage1Fraction, Action<double> stage2Fraction,
             out float[,] stage1, out float[,] stage2) {
             int frames = score.Duration.FrameCount;
@@ -1073,9 +1075,10 @@ namespace OpenUtau.Core.TsnVoice {
                 lf0Context[frame, 0] =
                     (float)TsnVoiceDsp.ScoreLf0(score.Controls[frame].MidiPitch);
             }
-            // 说话人条件沿用首行（与参考实现一致）。
-            float[,] speaker = RepeatedCode(frames, ConfigCodeOrEmpty(voice.Config,
-                "SPEAKER_CONTEXT_DIMENSIONS", "SPEAKER_CODE"));
+            // 说话人条件取首行（与参考实现一致，支持语言键回退）。
+            List<float[]> speakerRows = ConfigSpeakerRows(voice.Config, language);
+            float[,] speaker = RepeatedCode(frames,
+                speakerRows.Count == 0 ? Array.Empty<float>() : speakerRows[0]);
             float[,] stage1Input = ConcatenateColumns(new List<float[,]> {
                 lf0Context, emotion, speaker, frameContext, linguistic,
             });
@@ -1479,8 +1482,16 @@ namespace OpenUtau.Core.TsnVoice {
             if (isCancelled()) {
                 throw new TsnVoiceException(TsnVoiceStatus.Cancelled, "合成已取消");
             }
+            // 表情/说话人按 run 语言解析（含语言键与独热回退），
+            // 缺省混合权重取语音 DEFAULT_INTERPOLATION_RATIO。
+            string runLanguage = notes[0].Language;
+            List<float[]> emotionRows = ConfigEmotionRows(voice.Config, runLanguage);
+            double[] defaultEmotion = ConfigDefaultEmotionWeights(
+                voice.Config, emotionRows.Count);
             RunAcousticModels(voice, sessions, score, linguistic, frameContext,
-                BuildEmotionMatrix(voice, score, notes, emotionWeightsPerNote),
+                BuildEmotionMatrix(voice, score, notes, emotionWeightsPerNote,
+                    emotionRows, defaultEmotion),
+                runLanguage,
                 f => reportProgress(0.34f + (float)(0.15 * f), "acoustic"),
                 f => reportProgress(0.49f + (float)(0.15 * f), "acoustic"),
                 out float[,] stage1, out float[,] stage2);

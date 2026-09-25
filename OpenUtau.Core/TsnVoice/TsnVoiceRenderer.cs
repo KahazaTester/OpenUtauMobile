@@ -632,7 +632,8 @@ namespace OpenUtau.Core.TsnVoice {
             RenderPhrase phrase, List<TsnVoiceInputNote> notes, double originMs) {
             int count;
             try {
-                count = TsnVoiceInference.EmotionRowCount(package.Config);
+                string language = notes.Count > 0 ? notes[0].Language : string.Empty;
+                count = TsnVoiceInference.EmotionRowCount(package.Config, language);
             } catch (Exception e) {
                 Log.Warning(e, "读取 TsnVoice 表情行数失败，使用缺省权重");
                 return null;
@@ -879,7 +880,8 @@ namespace OpenUtau.Core.TsnVoice {
                 try {
                     TsnVoicePackage package =
                         TsnVoicePackage.Load(tsnSinger.Location);
-                    int count = TsnVoiceInference.EmotionRowCount(package.Config);
+                    int count = TsnVoiceInference.EmotionRowCount(package.Config,
+                        tsnSinger.PrimaryLanguage());
                     if (count > 1) {
                         return TsnVoiceParameters.BuildSuggestedExpressions(
                             count, TsnVoiceEmotions.FindEmotions(tsnSinger.Location));

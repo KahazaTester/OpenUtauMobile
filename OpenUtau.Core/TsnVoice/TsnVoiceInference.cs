@@ -196,6 +196,16 @@ namespace OpenUtau.Core.TsnVoice {
                 TsnVoiceVoiceHandle handle = new TsnVoiceVoiceHandle();
                 handle.Package = TsnVoicePackage.Load(voicePath);
                 LoadSessions(handle);
+                try {
+                    List<string> keys = new List<string>();
+                    foreach (KeyValuePair<string, string> pair in handle.Package.Config) {
+                        keys.Add(pair.Key + "(" + (pair.Value?.Length ?? 0) + ")");
+                    }
+                    keys.Sort(StringComparer.Ordinal);
+                    Serilog.Log.Information("TsnVoice 语音配置键：{Keys}",
+                        string.Join(",", keys));
+                } catch {
+                }
                 ReleaseModelBytes(handle.Package);
                 CachedVoice entry = new CachedVoice();
                 entry.Key = key;
@@ -425,9 +435,9 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         /// <summary>
-        /// 风格码宽松读取：缺失维度键或维度为零时返回空（该语音不用此条件）；
-        /// 维度非零但缺失编码时以零填充并记警告（参考实现直接报错中断，
-        /// 此处为可渲染降级），组装后的 CNN 输入维度校验仍会拦截真正不兼容的语音。
+        /// 风格码宽松读取（保留给单行旧调用方）：缺失维度键或维度为零返回空；
+        /// 维度非零但缺失编码时以零填充并记警告。
+        /// 表情/说话人请用 ConfigEmotionRows/ConfigSpeakerRows（含回退链）。
         /// </summary>
         static float[] ConfigCodeOrEmpty(Dictionary<string, string> config,
             string dimensionsKey, string codeKey) {
@@ -450,10 +460,8 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         /// <summary>
-        /// 风格码矩阵全行解析，对应 DnnVoice::Load 的 EMOTION_CODE/SPEAKER_CODE
-        /// 读取（二进制 0x1000f4730）：各分号行维度必须一致，否则报无效语音；
-        /// 缺失维度键或维度为零返回空；维度非零但缺失编码时沿用可渲染降级
-        /// （记警告后以零填充首行，与 ConfigCodeOrEmpty 一致）。
+        /// 风格码矩阵全行解析（裸键），对应 DnnVoice::Load 的严格读取：
+        /// 各分号行维度必须一致，否则报无效语音；缺失返回空。
         /// </summary>
         public static List<float[]> ConfigCodeRows(Dictionary<string, string> config,
             string dimensionsKey, string codeKey) {
@@ -468,12 +476,14 @@ namespace OpenUtau.Core.TsnVoice {
             }
             if (!config.TryGetValue(codeKey, out string codeText)
                 || codeText.Length == 0) {
-                Serilog.Log.Warning(
-                    "语音声明 {Dimensions} 维 {Code} 但未提供编码，以零填充继续渲染",
-                    dimensions, codeKey);
-                result.Add(new float[dimensions]);
                 return result;
             }
+            return ParseCodeRows(codeKey, codeText, dimensions);
+        }
+
+        static List<float[]> ParseCodeRows(string codeKey, string codeText,
+            int dimensions) {
+            List<float[]> result = new List<float[]>();
             // 空行跳过（对应原生分词器忽略空记号），全空按缺失处理。
             bool anyRow = false;
             foreach (string row in codeText.Split(';')) {
@@ -499,12 +509,6 @@ namespace OpenUtau.Core.TsnVoice {
                 result.Add(values.ToArray());
             }
             if (!anyRow) {
-                // 全空与缺失同等处理：记警告后零填充，保证渲染不中断
-                // （对应二进制缺失时跳过、中断延后的容忍策略）。
-                Serilog.Log.Warning(
-                    "语音声明 {Dimensions} 维 {Code} 但未提供编码，以零填充继续渲染",
-                    dimensions, codeKey);
-                result.Add(new float[dimensions]);
                 return result;
             }
             if (result.Count == 0) {
@@ -514,10 +518,160 @@ namespace OpenUtau.Core.TsnVoice {
             return result;
         }
 
+        /// <summary>
+        /// 表情矩阵全行解析（含缺省回退链），对应二进制两条读取路径：
+        /// DnnVoice::Load 的裸 EMOTION_CODE，以及 DnnVoice::Settings 经
+        /// AVAILABLE_EMOTION_INDICES 构造的独热行（缺编码时）。
+        /// 顺序：裸编码 → 语言编码 → 独热回退 → 零填充（记警告）。
+        /// 独热回退保证缺编码语音仍有非零条件，避免模型输入全零劣化。
+        /// </summary>
+        public static List<float[]> ConfigEmotionRows(
+            Dictionary<string, string> config, string language) {
+            if (!config.TryGetValue("EMOTION_CONTEXT_DIMENSIONS",
+                out string dimensionsText) || dimensionsText.Length == 0) {
+                return new List<float[]>();
+            }
+            int dimensions = ConfigSize(config,
+                "EMOTION_CONTEXT_DIMENSIONS", 0, true);
+            if (dimensions == 0) {
+                return new List<float[]>();
+            }
+            if (config.TryGetValue("EMOTION_CODE", out string bare)
+                && bare.Length > 0) {
+                return ParseCodeRows("EMOTION_CODE", bare, dimensions);
+            }
+            string languageKey = (language ?? string.Empty).Trim() + "_EMOTION_CODE";
+            if (config.TryGetValue(languageKey, out string localized)
+                && localized.Length > 0) {
+                Serilog.Log.Information(
+                    "语音使用语言表情编码 {Key}（{Dimensions} 维）", languageKey, dimensions);
+                return ParseCodeRows(languageKey, localized, dimensions);
+            }
+            List<float[]> oneHot = OneHotRows(config, language,
+                "AVAILABLE_EMOTION_INDICES", dimensions);
+            if (oneHot.Count > 0) {
+                Serilog.Log.Information(
+                    "语音缺 EMOTION_CODE，按可用表情索引构造 {Rows} 个独热行", oneHot.Count);
+                return oneHot;
+            }
+            Serilog.Log.Warning(
+                "语音声明 {Dimensions} 维 EMOTION_CODE 但未提供编码与可用索引，以零填充继续渲染",
+                dimensions);
+            List<float[]> result = new List<float[]>();
+            result.Add(new float[dimensions]);
+            return result;
+        }
+
+        /// <summary>
+        /// 说话人矩阵全行解析：裸编码 → 语言编码 → 零填充（记警告）。
+        /// </summary>
+        public static List<float[]> ConfigSpeakerRows(
+            Dictionary<string, string> config, string language) {
+            if (!config.TryGetValue("SPEAKER_CONTEXT_DIMENSIONS",
+                out string dimensionsText) || dimensionsText.Length == 0) {
+                return new List<float[]>();
+            }
+            int dimensions = ConfigSize(config,
+                "SPEAKER_CONTEXT_DIMENSIONS", 0, true);
+            if (dimensions == 0) {
+                return new List<float[]>();
+            }
+            if (config.TryGetValue("SPEAKER_CODE", out string bare)
+                && bare.Length > 0) {
+                return ParseCodeRows("SPEAKER_CODE", bare, dimensions);
+            }
+            string languageKey = (language ?? string.Empty).Trim() + "_SPEAKER_CODE";
+            if (config.TryGetValue(languageKey, out string localized)
+                && localized.Length > 0) {
+                Serilog.Log.Information(
+                    "语音使用语言说话人编码 {Key}（{Dimensions} 维）", languageKey, dimensions);
+                return ParseCodeRows(languageKey, localized, dimensions);
+            }
+            Serilog.Log.Warning(
+                "语音声明 {Dimensions} 维 SPEAKER_CODE 但未提供编码，以零填充继续渲染",
+                dimensions);
+            List<float[]> result = new List<float[]>();
+            result.Add(new float[dimensions]);
+            return result;
+        }
+
+        /// <summary>
+        /// 由可用索引构造独热矩阵行，对应 Settings::Load 的回退路径：
+        /// 每个索引对应 dimensions 维单位向量；越界索引报无效语音。
+        /// 键按语言优先、裸键兜底（与 GetCodeList 一致）。
+        /// </summary>
+        static List<float[]> OneHotRows(Dictionary<string, string> config,
+            string language, string key, int dimensions) {
+            List<float[]> result = new List<float[]>();
+            string text = null;
+            string languageKey = (language ?? string.Empty).Trim() + "_" + key;
+            if (!config.TryGetValue(languageKey, out text) || text.Length == 0) {
+                if (!config.TryGetValue(key, out text) || text.Length == 0) {
+                    return result;
+                }
+            }
+            foreach (string item in text.Split(',')) {
+                string trimmed = item.Trim();
+                if (trimmed.Length == 0) {
+                    continue;
+                }
+                if (!int.TryParse(trimmed, out int index) || index < 0
+                    || index >= dimensions) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        key + " 存在越界索引");
+                }
+                float[] row = new float[dimensions];
+                row[index] = 1.0f;
+                result.Add(row);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 缺省表情混合权重，对应 DnnVoice::Load 的 DEFAULT_INTERPOLATION_RATIO：
+        /// 缺失时取首行；存在时按 [0,1] 钳制后原样使用（不归一）；
+        /// 长度与行数不一致记警告后取首行。
+        /// </summary>
+        public static double[] ConfigDefaultEmotionWeights(
+            Dictionary<string, string> config, int rows) {
+            double[] first = new double[Math.Max(0, rows)];
+            if (first.Length > 0) {
+                first[0] = 1.0;
+            }
+            if (rows <= 0) {
+                return first;
+            }
+            if (!config.TryGetValue("DEFAULT_INTERPOLATION_RATIO", out string text)
+                || text.Trim().Length == 0) {
+                return first;
+            }
+            List<double> values = new List<double>();
+            foreach (string item in text.Split(',')) {
+                string trimmed = item.Trim();
+                if (trimmed.Length == 0) {
+                    continue;
+                }
+                if (!double.TryParse(trimmed, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out double value)
+                    || double.IsNaN(value) || double.IsInfinity(value)) {
+                    throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                        "DEFAULT_INTERPOLATION_RATIO 存在非数字");
+                }
+                values.Add(Math.Clamp(value, 0.0, 1.0));
+            }
+            if (values.Count != rows) {
+                Serilog.Log.Warning(
+                    "语音 DEFAULT_INTERPOLATION_RATIO 长度 {Actual} 与表情行数 {Rows} 不一致，取首行",
+                    values.Count, rows);
+                return first;
+            }
+            return values.ToArray();
+        }
+
         /// <summary>语音表情矩阵行数（0 表示该语音不用表情条件）。</summary>
-        public static int EmotionRowCount(Dictionary<string, string> config) {
-            return ConfigCodeRows(config,
-                "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE").Count;
+        public static int EmotionRowCount(Dictionary<string, string> config,
+            string language = null) {
+            return ConfigEmotionRows(config, language ?? string.Empty).Count;
         }
 
         /// <summary>
