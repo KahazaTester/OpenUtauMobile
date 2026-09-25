@@ -1006,9 +1006,14 @@ namespace OpenUtau.Core.TsnVoice {
         /// </summary>
         static float[,] BuildEmotionMatrix(TsnVoicePackage voice, PreparedScore score,
             List<TsnVoiceInputNote> notes, List<double[]> weightsPerNote,
-            List<float[]> emotionRows, double[] defaultWeights) {
+            List<float[]> emotionRows, double[] defaultWeights,
+            out double[][] frameWeights) {
             int frames = score.Duration.FrameCount;
             if (emotionRows.Count <= 1) {
+                frameWeights = new double[frames][];
+                for (int frame = 0; frame < frames; frame++) {
+                    frameWeights[frame] = defaultWeights;
+                }
                 return RepeatedCode(frames,
                     emotionRows.Count == 0 ? Array.Empty<float>() : emotionRows[0]);
             }
@@ -1047,7 +1052,7 @@ namespace OpenUtau.Core.TsnVoice {
                     noteStartFrames[n] = n == 0 ? 0 : noteStartFrames[n - 1];
                 }
             }
-            double[][] frameWeights = TsnVoiceParameters.InterpolateNoteWeights(
+            frameWeights = TsnVoiceParameters.InterpolateNoteWeights(
                 normalized, noteStartFrames, frames);
             float[,] result = new float[frames, emotionRows[0].Length];
             for (int frame = 0; frame < frames; frame++) {
@@ -1490,14 +1495,36 @@ namespace OpenUtau.Core.TsnVoice {
                 voice.Config, emotionRows.Count);
             RunAcousticModels(voice, sessions, score, linguistic, frameContext,
                 BuildEmotionMatrix(voice, score, notes, emotionWeightsPerNote,
-                    emotionRows, defaultEmotion),
+                    emotionRows, defaultEmotion, out double[][] frameEmotionWeights),
                 runLanguage,
                 f => reportProgress(0.34f + (float)(0.15 * f), "acoustic"),
                 f => reportProgress(0.49f + (float)(0.15 * f), "acoustic"),
                 out float[,] stage1, out float[,] stage2);
+            double[] huskyShift = BlendHuskyShift(voice, emotionRows,
+                frameEmotionWeights);
+            // 首帧混合诊断：证明曲线权重到达合成（行数/默认或用户权重/混合码强度）。
+            try {
+                double codeAbs = 0;
+                if (emotionRows.Count > 0) {
+                    for (int j = 0; j < emotionRows[0].Length; j++) {
+                        codeAbs += Math.Abs(emotionRows[0][j]);
+                    }
+                }
+                List<string> weightText = new List<string>();
+                if (frameEmotionWeights.Length > 0) {
+                    foreach (double weight in frameEmotionWeights[0]) {
+                        weightText.Add(weight.ToString("F3",
+                            System.Globalization.CultureInfo.InvariantCulture));
+                    }
+                }
+                Serilog.Log.Information(
+                    "TsnVoice 表情混合：{Rows} 行，首音符权重 [{Weights}]，首行码强度 {CodeAbs:F1}",
+                    emotionRows.Count, string.Join(";", weightText), codeAbs);
+            } catch {
+            }
             TsnVoiceAcousticParameters acoustic = TsnVoiceAcoustic.Postprocess(
                 voice, stage1, stage2,
-                score.FramePhonemes.ToArray(), score.Controls.ToArray());
+                score.FramePhonemes.ToArray(), score.Controls.ToArray(), huskyShift);
             ApplyPitchConstraints(score, acoustic);
             SmoothFreePitchBoundaries(score, acoustic);
             reportProgress(0.64f, "acoustic");

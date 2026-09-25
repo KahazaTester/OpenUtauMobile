@@ -167,7 +167,8 @@ namespace OpenUtau.Core.TsnVoice {
 
         public static TsnVoiceAcousticParameters Postprocess(
             TsnVoicePackage voice, float[,] stage1, float[,] stage2,
-            string[] framePhonemes, TsnVoiceFrameControls[] controls) {
+            string[] framePhonemes, TsnVoiceFrameControls[] controls,
+            double[] huskyShift = null) {
             int frames = stage1.GetLength(0);
             if (frames == 0 || stage1.GetLength(1) != 7
                 || stage2.GetLength(0) != frames
@@ -252,7 +253,10 @@ namespace OpenUtau.Core.TsnVoice {
             double[] c0 = new double[frames];
             for (int frame = 0; frame < frames; frame++) {
                 c0[frame] = stage1[frame, 6];
-                bap[frame, 0] = stage1[frame, 5] - controls[frame].Huskiness;
+                double shift = huskyShift != null && frame < huskyShift.Length
+                    ? huskyShift[frame]
+                    : 0.0;
+                bap[frame, 0] = stage1[frame, 5] - controls[frame].Huskiness - shift;
                 int read = 0;
                 for (int dimension = 1; dimension < mgcDimensions; dimension++) {
                     mgc[frame, dimension] = stage2[frame, read++];

@@ -204,6 +204,33 @@ namespace OpenUtau.Core.TsnVoice {
                     keys.Sort(StringComparer.Ordinal);
                     Serilog.Log.Information("TsnVoice 语音配置键：{Keys}",
                         string.Join(",", keys));
+                    // 小标量诊断白名单（无模型数据）：取值直接记录，
+                    // 用于核对 HUSKY_SHIFT/激励类型等新键语义。
+                    foreach (string dumpKey in new string[] {
+                        "ALPHA", "MIN_ALPHA", "MAX_ALPHA", "HUSKY_SHIFT", "GAMMA",
+                        "EXCITATION_TYPE", "SPECTRUM_TYPE", "RUNTIME_TYPE",
+                        "DEFAULT_INTERPOLATION_RATIO", "AVAILABLE_EMOTION_INDICES",
+                        "LANGUAGE", "LABEL_TYPE", "NOISE_GATE_TYPE",
+                        "MLSA_TIME_INTERPOLATION_TYPE", "MGC_MULTIPLY", "MGC_SHIFT",
+                    }) {
+                        if (handle.Package.Config.TryGetValue(dumpKey, out string value)
+                            && value != null && value.Length <= 256) {
+                            Serilog.Log.Information("TsnVoice 语音配置 {Key}={Value}",
+                                dumpKey, value);
+                        }
+                    }
+                    foreach (TsnVoiceModelSet modelSet in new TsnVoiceModelSet[] {
+                        handle.Package.AcousticStage1Model,
+                        handle.Package.AcousticStage2Model,
+                        handle.Package.VocoderModel,
+                    }) {
+                        if (modelSet?.Config?.Count > 0) {
+                            List<string> modelKeys = new List<string>(modelSet.Config.Keys);
+                            modelKeys.Sort(StringComparer.Ordinal);
+                            Serilog.Log.Information("TsnVoice 模型 {Role} 配置键：{Keys}",
+                                modelSet.Role, string.Join(",", modelKeys));
+                        }
+                    }
                 } catch {
                 }
                 ReleaseModelBytes(handle.Package);
@@ -666,6 +693,69 @@ namespace OpenUtau.Core.TsnVoice {
                 return first;
             }
             return values.ToArray();
+        }
+
+        /// <summary>
+        /// 气声偏移表，对应 DnnVoice::Load 的 HUSKY_SHIFT（裸键）：
+        /// 缺失返回空（无修正）；单个值全局使用；与表情行数等长时按权重混合；
+        /// 其他长度记警告后忽略。
+        /// </summary>
+        public static double[] ConfigHuskyShift(
+            Dictionary<string, string> config, int rows) {
+            List<double> values = new List<double>();
+            if (config.TryGetValue("HUSKY_SHIFT", out string text)
+                && text != null && text.Trim().Length > 0) {
+                foreach (string item in text.Split(',')) {
+                    string trimmed = item.Trim();
+                    if (trimmed.Length == 0) {
+                        continue;
+                    }
+                    if (!double.TryParse(trimmed, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double value)
+                        || double.IsNaN(value) || double.IsInfinity(value)) {
+                        throw new TsnVoiceException(TsnVoiceStatus.InvalidVoice,
+                            "HUSKY_SHIFT 存在非数字");
+                    }
+                    values.Add(value);
+                }
+            }
+            if (values.Count == 0 || values.Count == rows || values.Count == 1) {
+                return values.ToArray();
+            }
+            Serilog.Log.Warning(
+                "语音 HUSKY_SHIFT 长度 {Actual} 与表情行数 {Rows} 不一致，已忽略",
+                values.Count, rows);
+            return Array.Empty<double>();
+        }
+
+        /// <summary>
+        /// 逐帧气声偏移：桌面端按混合权重将风格偏移叠加到气声参数
+        /// （StyleParameterShifter::Read，out += ratio * shift）；
+        /// 此处叠加到用户 HUS 控制上（bap[0] = stage1[5] - huskiness - shift）。
+        /// </summary>
+        public static double[] BlendHuskyShift(TsnVoicePackage voice,
+            List<float[]> emotionRows, double[][] frameWeights) {
+            int frames = frameWeights.Length;
+            double[] result = new double[frames];
+            double[] table = ConfigHuskyShift(voice.Config, emotionRows.Count);
+            if (table.Length == 0) {
+                return result;
+            }
+            if (table.Length == 1) {
+                for (int frame = 0; frame < frames; frame++) {
+                    result[frame] = table[0];
+                }
+                return result;
+            }
+            for (int frame = 0; frame < frames; frame++) {
+                double[] weights = frameWeights[frame];
+                double blended = 0;
+                for (int i = 0; i < emotionRows.Count && i < weights.Length; i++) {
+                    blended += table[i] * weights[i];
+                }
+                result[frame] = blended;
+            }
+            return result;
         }
 
         /// <summary>语音表情矩阵行数（0 表示该语音不用表情条件）。</summary>
