@@ -240,8 +240,8 @@ namespace OpenUtau.Core.TsnVoice {
                     TsnVoiceParameters.IsAutoPitchEnabled(), autoNote);
                 List<TsnVoiceControlPoint> controls = SampleControls(
                     phrase, originMs, runFirstMs, runEndMs);
-                double[] emotionWeights = SampleEmotionWeights(
-                    package, phrase, runFirstMs);
+                List<double[]> emotionWeights = SampleEmotionWeights(
+                    package, phrase, notes, originMs);
                 double runBase = (runFirstMs - originMs) / totalMs;
                 double runSpan = Math.Max(0.0, runEndMs - runFirstMs) / totalMs;
                 int capturedIndex = runIndex;
@@ -605,11 +605,11 @@ namespace OpenUtau.Core.TsnVoice {
         }
 
         /// <summary>
-        /// 表情混合权重采样：二进制全局混合语义为整句恒定，
-        /// 此处取 run 起始处的绘制值；无 EMO 曲线时返回首行权重。
+        /// 表情混合权重采样：每音符在其起始处取值（XSY 式逐音符表情），
+        /// 合成时按音素归属逐帧混合；无 EMO 曲线时返回首行权重。
         /// </summary>
-        static double[] SampleEmotionWeights(TsnVoicePackage package,
-            RenderPhrase phrase, double startMs) {
+        static List<double[]> SampleEmotionWeights(TsnVoicePackage package,
+            RenderPhrase phrase, List<TsnVoiceInputNote> notes, double originMs) {
             int count;
             try {
                 count = TsnVoiceInference.EmotionRowCount(package.Config);
@@ -620,23 +620,28 @@ namespace OpenUtau.Core.TsnVoice {
             if (count <= 1) {
                 return null;
             }
-            double[] raw = new double[count];
-            raw[0] = 1.0;
-            if (phrase.curves == null) {
-                return raw;
-            }
-            int ticks = phrase.timeAxis.MsPosToTickPos(startMs)
-                - (phrase.position - phrase.leading);
-            int index = ticks / 5;
-            for (int i = 0; i < count; i++) {
-                float[] curve = FindCurve(phrase.curves, "emo" + (i + 1));
-                if (curve != null && curve.Length > 0) {
-                    raw[i] = curve[Math.Clamp(index, 0, curve.Length - 1)];
-                } else if (i > 0) {
-                    raw[i] = 0.0;
+            List<double[]> result = new List<double[]>(notes.Count);
+            const int pitchInterval = 5;
+            foreach (TsnVoiceInputNote note in notes) {
+                double[] raw = new double[count];
+                raw[0] = 1.0;
+                if (phrase.curves != null) {
+                    double ms = originMs + note.StartSeconds * 1000.0;
+                    int ticks = phrase.timeAxis.MsPosToTickPos(ms)
+                        - (phrase.position - phrase.leading);
+                    int index = ticks / pitchInterval;
+                    for (int i = 0; i < count; i++) {
+                        float[] curve = FindCurve(phrase.curves, "emo" + (i + 1));
+                        if (curve != null && curve.Length > 0) {
+                            raw[i] = curve[Math.Clamp(index, 0, curve.Length - 1)];
+                        } else if (i > 0) {
+                            raw[i] = 0.0;
+                        }
+                    }
                 }
+                result.Add(raw);
             }
-            return raw;
+            return result;
         }
 
         static List<TsnVoiceControlPoint> SampleControls(RenderPhrase phrase,

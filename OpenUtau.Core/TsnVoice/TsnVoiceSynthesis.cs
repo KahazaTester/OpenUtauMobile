@@ -999,9 +999,73 @@ namespace OpenUtau.Core.TsnVoice {
                 f => fraction?.Invoke(0.6 + f * 0.4));
         }
 
+        /// <summary>
+        /// 逐帧表情条件矩阵：单行/缺省时退化为首行重复（与旧行为一致）；
+        /// 多行时按音素归属的音符权重逐帧混合（归一规则见二进制全局混合语义），
+        /// 无归属帧（首尾静默）沿用最近音符。
+        /// </summary>
+        static float[,] BuildEmotionMatrix(TsnVoicePackage voice, PreparedScore score,
+            List<TsnVoiceInputNote> notes, List<double[]> weightsPerNote) {
+            int frames = score.Duration.FrameCount;
+            List<float[]> rows = ConfigCodeRows(voice.Config,
+                "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE");
+            if (rows.Count <= 1) {
+                return RepeatedCode(frames,
+                    rows.Count == 0 ? Array.Empty<float>() : rows[0]);
+            }
+            double[][] normalized = new double[notes.Count][];
+            for (int n = 0; n < notes.Count; n++) {
+                double[] raw = weightsPerNote != null && n < weightsPerNote.Count
+                    && weightsPerNote[n] != null
+                    ? weightsPerNote[n]
+                    : new double[] { 1.0 };
+                normalized[n] = TsnVoiceParameters.NormalizeEmotionWeights(
+                    raw, rows.Count);
+            }
+            int[] framePhone = new int[frames];
+            for (int i = 0; i < frames; i++) {
+                framePhone[i] = -1;
+            }
+            foreach (TsnVoiceStateTiming timing in score.Duration.Timings) {
+                for (int frame = timing.StartFrame;
+                    frame < timing.EndFrame && frame < frames; frame++) {
+                    if (frame >= 0) {
+                        framePhone[frame] = timing.PhonemeIndex;
+                    }
+                }
+            }
+            Dictionary<string, int> noteIndexById =
+                new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int n = 0; n < notes.Count; n++) {
+                noteIndexById[notes[n].Id] = n;
+            }
+            float[,] result = new float[frames, rows[0].Length];
+            int fallback = 0;
+            for (int frame = 0; frame < frames; frame++) {
+                int note = fallback;
+                int phone = framePhone[frame];
+                if (phone >= 0 && phone < score.PhoneNoteIds.Count) {
+                    string id = score.PhoneNoteIds[phone];
+                    if (id != null && noteIndexById.TryGetValue(id, out int found)) {
+                        note = found;
+                        fallback = found;
+                    }
+                }
+                double[] weights = normalized[note];
+                for (int i = 0; i < rows.Count; i++) {
+                    float[] row = rows[i];
+                    double weight = weights[i];
+                    for (int j = 0; j < result.GetLength(1); j++) {
+                        result[frame, j] += (float)(row[j] * weight);
+                    }
+                }
+            }
+            return result;
+        }
+
         static void RunAcousticModels(TsnVoicePackage voice,
             Dictionary<string, SessionEntry> sessions, PreparedScore score,
-            float[,] linguistic, float[,] frameContext, double[] emotionWeights,
+            float[,] linguistic, float[,] frameContext, float[,] emotion,
             Action<double> stage1Fraction, Action<double> stage2Fraction,
             out float[,] stage1, out float[,] stage2) {
             int frames = score.Duration.FrameCount;
@@ -1010,12 +1074,7 @@ namespace OpenUtau.Core.TsnVoice {
                 lf0Context[frame, 0] =
                     (float)TsnVoiceDsp.ScoreLf0(score.Controls[frame].MidiPitch);
             }
-            // 表情条件：全行解析后按全局混合权重合成；单行/缺省时退化为
-            // 首行（与旧行为一致，权重无关）。说话人条件沿用首行。
-            List<float[]> emotionRows = ConfigCodeRows(voice.Config,
-                "EMOTION_CONTEXT_DIMENSIONS", "EMOTION_CODE");
-            float[,] emotion = RepeatedCode(frames,
-                BlendEmotionCode(emotionRows, emotionWeights));
+            // 说话人条件沿用首行（与参考实现一致）。
             float[,] speaker = RepeatedCode(frames, ConfigCodeOrEmpty(voice.Config,
                 "SPEAKER_CONTEXT_DIMENSIONS", "SPEAKER_CODE"));
             float[,] stage1Input = ConcatenateColumns(new List<float[,]> {
@@ -1375,15 +1434,15 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>
         /// 完整合成：时序→语言→声学→激励→声码→裁剪。
-        /// emotionWeights 为全局表情混合权重（可空，缺省首行），
-        /// 对应二进制全局混合语义，整句恒定。
+        /// emotionWeightsPerNote 为逐音符全局混合权重（可空，缺省首行），
+        /// 与 notes 一一对应；多行时按音素归属逐帧混合。
         /// </summary>
         public static TsnVoiceSynthesisOutput Synthesize(
             TsnVoicePackage voice, List<TsnVoiceInputNote> notes,
             List<TsnVoicePitchPoint> pitchPoints, List<TsnVoiceControlPoint> controlPoints,
             Func<bool> isCancelled, Action<float, string> reportProgress,
             Action<TsnVoiceSynthesisOutput> reportMetadata,
-            double[] emotionWeights = null) {
+            List<double[]> emotionWeightsPerNote = null) {
             if (notes.Count > 100000 || pitchPoints.Count > 10000000
                 || controlPoints.Count > 10000000) {
                 throw new TsnVoiceException(TsnVoiceStatus.InvalidArgument,
@@ -1422,7 +1481,7 @@ namespace OpenUtau.Core.TsnVoice {
                 throw new TsnVoiceException(TsnVoiceStatus.Cancelled, "合成已取消");
             }
             RunAcousticModels(voice, sessions, score, linguistic, frameContext,
-                emotionWeights,
+                BuildEmotionMatrix(voice, score, notes, emotionWeightsPerNote),
                 f => reportProgress(0.34f + (float)(0.15 * f), "acoustic"),
                 f => reportProgress(0.49f + (float)(0.15 * f), "acoustic"),
                 out float[,] stage1, out float[,] stage2);
