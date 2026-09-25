@@ -24,7 +24,8 @@ namespace OpenUtau.Core.Render {
         public readonly double endMs;
 
         /// <summary>
-        /// 是否含用户绘制的音高：任一非零音高点（自动 portamento 首点除外）。
+        /// 是否含用户绘制的音高：任一非零音高点（自动 portamento 首点除外），
+        /// 或用户设置的颤音（默认长度为 0 即无颤音）。
         /// 相邻音符的 snapFirst 首点由 Validate 按前后音高差自动写入，
         /// 并非手绘，须排除，否则链中除首音符外全部被误判为手绘；
         /// 新建与重置后的默认平直音高点不计入。仅供 TsnVoice 区分自动 F0
@@ -44,8 +45,9 @@ namespace OpenUtau.Core.Render {
             if (prev != null && prev.End == note.Position) {
                 snapY = (prev.AdjustedTone - note.AdjustedTone) * 10;
             }
-            bool manual = false;
-            for (int i = 0; i < note.PitchPoints.Count; i++) {
+            bool manual = note.Vibrato != null
+                && note.Vibrato.Length > 0 && note.Vibrato.Depth != 0;
+            for (int i = 0; i < note.PitchPoints.Count && !manual; i++) {
                 float y = note.PitchPoints[i].Y;
                 if (y == 0) {
                     continue;
