@@ -226,7 +226,7 @@ namespace OpenUtau.Core.Util {
             public bool DiffSingerLangCodeHide = false;
             public bool Metronome = false;
             public bool SkipRenderingMutedTracks = false;
-            public string Language = "system";
+            public string Language = "en";
             public string? SortingOrder = null;
             public List<string> RecentFiles = new List<string>();
             public string SkipUpdate = string.Empty;

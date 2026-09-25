@@ -77,15 +77,15 @@ public static class LocalizationManager
 
     /// <summary>
     /// Resolves language preference to a supported resource language code.
-    /// Empty or "system" preference uses system UI language and falls back to zh-Hans.
-    /// Explicit codes fall back to en when unsupported.
+    /// Empty or "system" preference always defaults to English at startup;
+    /// explicit codes fall back to en when unsupported.
     /// </summary>
     public static string ResolveLanguagePreference(string? preferenceCode)
     {
         if (string.IsNullOrWhiteSpace(preferenceCode) ||
             string.Equals(preferenceCode, FollowSystemLanguageCode, StringComparison.OrdinalIgnoreCase))
         {
-            return ResolveSystemLanguage();
+            return ExplicitLanguageFallbackCode;
         }
 
         return Resolve(preferenceCode, ExplicitLanguageFallbackCode);
