@@ -202,19 +202,25 @@ namespace OpenUtau.Core.TsnVoice {
 
         /// <summary>ALP/HUS 自定义曲线描述，供渲染器 GetSuggestedExpressions 返回。</summary>
         public static UExpressionDescriptor[] BuildSuggestedExpressions() {
+            // 注意：此构造不设 type，须显式标为 Curve，否则乐句构建按
+            // Numerical 过滤掉，曲线永远到不了渲染器。
             return new UExpressionDescriptor[] {
                 new UExpressionDescriptor(
                     "ALP (alpha)",
                     "alp",
                     AlphaMin,
                     AlphaMax,
-                    AlphaDefault),
+                    AlphaDefault) {
+                    type = Ustx.UExpressionType.Curve,
+                },
                 new UExpressionDescriptor(
                     "HUS (huskiness)",
                     "hus",
                     HuskinessMin,
                     HuskinessMax,
-                    HuskinessDefault),
+                    HuskinessDefault) {
+                    type = Ustx.UExpressionType.Curve,
+                },
             };
         }
 

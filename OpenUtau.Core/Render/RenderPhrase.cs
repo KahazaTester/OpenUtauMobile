@@ -24,22 +24,39 @@ namespace OpenUtau.Core.Render {
         public readonly double endMs;
 
         /// <summary>
-        /// 是否含用户绘制的音高（任一音高点 Y 非零）。
-        /// 新建与重置后的默认平直音高点不计入，仅供 TsnVoice 区分自动 F0 与绝对音高；
-        /// 其他渲染器忽略此字段，行为不变。
+        /// 是否含用户绘制的音高：任一非零音高点（自动 portamento 首点除外）。
+        /// 相邻音符的 snapFirst 首点由 Validate 按前后音高差自动写入，
+        /// 并非手绘，须排除，否则链中除首音符外全部被误判为手绘；
+        /// 新建与重置后的默认平直音高点不计入。仅供 TsnVoice 区分自动 F0
+        /// 与绝对音高；其他渲染器忽略此字段，行为不变。
         /// </summary>
         public readonly bool hasManualPitch;
 
-        public RenderNote(Pipeline.NoteSource note, TimeAxis axis, int partPosition, int phrasePosition) {
+        public RenderNote(Pipeline.NoteSource note, Pipeline.NoteSource prev,
+            TimeAxis axis, int partPosition, int phrasePosition) {
             lyric = note.Lyric;
             tone = note.Tone;
             tuning = note.Tuning;
             adjustedTone = note.AdjustedTone;
-            hasManualPitch = note.PitchPoints.Any(p => p.Y != 0);
-            lyric = note.Lyric;
-            tone = note.Tone;
-            tuning = note.Tuning;
-            adjustedTone = note.AdjustedTone;
+            // 与 UNote.Validate 的 snapFirst 规则一致：相邻前音符存在时，
+            // 首点 Y 为前后有效音高差（允许微小浮点误差），不计入手绘。
+            float snapY = 0;
+            if (prev != null && prev.End == note.Position) {
+                snapY = (prev.AdjustedTone - note.AdjustedTone) * 10;
+            }
+            bool manual = false;
+            for (int i = 0; i < note.PitchPoints.Count; i++) {
+                float y = note.PitchPoints[i].Y;
+                if (y == 0) {
+                    continue;
+                }
+                if (i == 0 && Math.Abs(y - snapY) < 1e-3f) {
+                    continue;
+                }
+                manual = true;
+                break;
+            }
+            hasManualPitch = manual;
 
             position = partPosition + note.Position - phrasePosition;
             duration = note.Duration;
@@ -274,7 +291,15 @@ namespace OpenUtau.Core.Render {
             duration = end - position;
 
             notes = uNotes
-                .Select(n => new RenderNote(notesOf[n], timeAxis, source.PartPosition, position))
+                .Select(n => {
+                    // 与 UNote.Validate 一致的声部前后关系，用于排除 snap 首点。
+                    int prevIdx = notesOf[n].Prev;
+                    Pipeline.NoteSource prev = prevIdx >= 0 && prevIdx < notesOf.Length
+                        ? notesOf[prevIdx]
+                        : null;
+                    return new RenderNote(notesOf[n], prev, timeAxis,
+                        source.PartPosition, position);
+                })
                 .ToArray();
             // 快照索引对应整个分片，Neutrino 需要当前乐句内的音符索引。
             Dictionary<int, int> noteIndexByNote = uNotes
