@@ -861,7 +861,8 @@ namespace OpenUtau.Core.TsnVoice {
                         TsnVoicePackage.Load(tsnSinger.Location);
                     int count = TsnVoiceInference.EmotionRowCount(package.Config);
                     if (count > 1) {
-                        return TsnVoiceParameters.BuildSuggestedExpressions(count);
+                        return TsnVoiceParameters.BuildSuggestedExpressions(
+                            count, TsnVoiceEmotions.FindEmotions(tsnSinger.Location));
                     }
                 } catch (Exception e) {
                     Log.Warning(e, "读取 TsnVoice 表情行数失败，仅建议 ALP/HUS");

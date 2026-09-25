@@ -288,9 +288,15 @@ namespace OpenUtau.Core.TsnVoice {
         /// <summary>
         /// 含表情混合的曲线描述：ALP/HUS 之后追加 EMO1..EMON。
         /// 表情索引与语音 EMOTION_CODE 矩阵行对应（行数见推理层），
-        /// 名称在语音侧无定义（桌面端名称来自工程 XML），此处按序号命名。
+        /// 名称来自目录 list.json（缺失时按序号命名）；缩写恒为 emoN。
         /// </summary>
         public static UExpressionDescriptor[] BuildSuggestedExpressions(int emotionCount) {
+            return BuildSuggestedExpressions(emotionCount, null);
+        }
+
+        /// <summary>同上，names 为目录表情名（可空或短于行数）。</summary>
+        public static UExpressionDescriptor[] BuildSuggestedExpressions(
+            int emotionCount, string[] names) {
             // 注意：此构造不设 type，须显式标为 Curve，否则乐句构建按
             // Numerical 过滤掉，曲线永远到不了渲染器。
             List<UExpressionDescriptor> result = new List<UExpressionDescriptor>() {
@@ -313,8 +319,12 @@ namespace OpenUtau.Core.TsnVoice {
             };
             for (int i = 0; i < emotionCount; i++) {
                 // 默认首表情权重 1：无绘制时等价于固定首行，与旧行为一致。
+                string label = names != null && i < names.Length
+                    && names[i].Length > 0
+                    ? names[i]
+                    : "EMO" + (i + 1);
                 result.Add(new UExpressionDescriptor(
-                    "EMO" + (i + 1) + " (emotion)",
+                    label + " (emotion)",
                     "emo" + (i + 1),
                     0f,
                     1f,
